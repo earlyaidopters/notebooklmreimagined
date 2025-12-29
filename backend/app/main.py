@@ -10,7 +10,7 @@ settings = get_settings()
 
 app = FastAPI(
     title=settings.app_name,
-    description="Open NotebookLM - An API-first research intelligence platform",
+    description="NotebookLM Reimagined - An API-first research intelligence platform",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",

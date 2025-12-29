@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     google_api_key: str
 
     # App
-    app_name: str = "Open NotebookLM"
+    app_name: str = "NotebookLM Reimagined"
     debug: bool = False
 
     class Config:

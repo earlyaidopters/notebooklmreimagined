@@ -20,7 +20,7 @@ This ensures conversations never hit context limits and work continues uninterru
 
 ## Project Overview
 
-Open NotebookLM is an API-first research intelligence platform—an open alternative to Google's NotebookLM.
+NotebookLM Reimagined is an API-first research intelligence platform—Google's NotebookLM, reimagined for developers.
 
 **Architecture**: `Next.js (Frontend) → FastAPI (Backend) → Supabase (Auth + DB + Storage) → Gemini API`
 

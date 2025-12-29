@@ -4,11 +4,11 @@
   <img src="https://img.shields.io/badge/PRs-Welcome-brightgreen?style=for-the-badge" alt="PRs Welcome">
 </p>
 
-<h1 align="center">Open NotebookLM</h1>
+<h1 align="center">NotebookLM Reimagined</h1>
 
 <p align="center">
-  <strong>An open-source, API-first research intelligence platform</strong><br>
-  <em>The open alternative to Google's NotebookLM</em>
+  <strong>An API-first research intelligence platform</strong><br>
+  <em>Google's NotebookLM, reimagined for developers</em>
 </p>
 
 <p align="center">
@@ -21,9 +21,9 @@
 
 ---
 
-## What is Open NotebookLM?
+## What is NotebookLM Reimagined?
 
-Open NotebookLM is a **fully open-source** research platform that lets you:
+NotebookLM Reimagined is an **API-first** research platform that lets you:
 
 - **Upload any document** (PDFs, URLs, YouTube videos, text) and chat with your sources
 - **Generate podcast-style audio** summaries of your research
@@ -31,7 +31,7 @@ Open NotebookLM is a **fully open-source** research platform that lets you:
 - **Query across ALL your notebooks** with a single API call
 - **Access everything via API** for automation and integrations
 
-Unlike proprietary alternatives, Open NotebookLM gives you:
+Unlike proprietary alternatives, NotebookLM Reimagined gives you:
 - Full control over your data
 - API-first design for developers
 - Self-hosting capability
@@ -118,8 +118,8 @@ Unlike proprietary alternatives, Open NotebookLM gives you:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/open-notebooklm.git
-cd open-notebooklm
+git clone https://github.com/promptadvisers/notebooklmreimagined.git
+cd notebooklmreimagined
 ```
 
 ### 2. Backend Setup
@@ -249,7 +249,7 @@ For complete API documentation with cURL examples, visit `/docs` in the frontend
 ## Project Structure
 
 ```
-open-notebooklm/
+notebooklmreimagined/
 ├── backend/
 │   ├── app/
 │   │   ├── main.py              # FastAPI entry point
