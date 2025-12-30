@@ -669,10 +669,7 @@ export default function HistoryPage({ params }: { params: Promise<{ id: string }
               exit={{ opacity: 0 }}
               className="flex items-center justify-center py-20"
             >
-              <div className="glass-card p-8 rounded-2xl flex flex-col items-center gap-4">
-                <SpinnerGap className="h-8 w-8 text-[var(--accent-primary)] animate-spin" weight="bold" />
-                <p className="text-sm text-[var(--text-tertiary)]">Loading history...</p>
-              </div>
+              <SpinnerGap className="h-8 w-8 animate-spin text-[var(--accent-primary)]" />
             </motion.div>
           ) : error ? (
             <motion.div

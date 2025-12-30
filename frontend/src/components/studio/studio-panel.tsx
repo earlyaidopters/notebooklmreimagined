@@ -309,7 +309,7 @@ export function StudioPanel({
                   onClick={onOpenAudio}
                 >
                   View
-                  <CaretRight className="h-4 w-4" weight="bold ml-1" />
+                  <CaretRight className="h-4 w-4 ml-1" weight="bold" />
                 </Button>
               )}
             </div>
@@ -366,7 +366,7 @@ export function StudioPanel({
                   onClick={onOpenVideo}
                 >
                   View
-                  <CaretRight className="h-4 w-4" weight="bold ml-1" />
+                  <CaretRight className="h-4 w-4 ml-1" weight="bold" />
                 </Button>
               )}
             </div>
@@ -431,7 +431,7 @@ export function StudioPanel({
                   onClick={onOpenResearch}
                 >
                   View
-                  <CaretRight className="h-4 w-4" weight="bold ml-1" />
+                  <CaretRight className="h-4 w-4 ml-1" weight="bold" />
                 </Button>
               )}
             </div>
@@ -537,7 +537,7 @@ export function StudioPanel({
                               </TooltipContent>
                             </Tooltip>
                           )}
-                          <CaretRight className="h-4 w-4" weight="bold text-[var(--text-tertiary)]" />
+                          <CaretRight className="h-4 w-4 text-[var(--text-tertiary)]" weight="bold" />
                         </button>
                         <div className="px-3 py-1.5 bg-[var(--bg-tertiary)]/50 border-t border-[rgba(255,255,255,0.05)] flex items-center gap-3 text-[10px] text-[var(--text-tertiary)]">
                           <span className="flex items-center gap-1">
@@ -591,7 +591,7 @@ export function StudioPanel({
                 disabled={selectedSourcesCount === 0}
               />
               <StudyToolButton
-                icon={<Presentation className="h-5 w-5" />}
+                icon={<PresentationChart className="h-5 w-5" />}
                 label="Slide Deck"
                 color="text-violet-500"
                 onClick={() => openConfigDialog('slide_deck')}
@@ -623,7 +623,7 @@ export function StudioPanel({
                     const typeConfig: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
                       data_table: { icon: <Table className="h-4 w-4" />, label: 'Data Table', color: 'text-emerald-500' },
                       report: { icon: <ChartBar className="h-4 w-4" weight="duotone" />, label: 'Report', color: 'text-blue-500' },
-                      slide_deck: { icon: <Presentation className="h-4 w-4" />, label: 'Slide Deck', color: 'text-violet-500' },
+                      slide_deck: { icon: <PresentationChart className="h-4 w-4" />, label: 'Slide Deck', color: 'text-violet-500' },
                       infographic: { icon: <Image className="h-4 w-4" />, label: 'Infographic', color: 'text-rose-500' },
                     }
                     const config = typeConfig[output.type] || { icon: <FileText className="h-4 w-4" />, label: output.type, color: 'text-gray-500' }
@@ -640,7 +640,7 @@ export function StudioPanel({
                           <p className="text-sm font-medium text-[var(--text-primary)] truncate">{config.label}</p>
                           <p className="text-xs text-[var(--text-tertiary)]">{timeAgo}</p>
                         </div>
-                        <CaretRight className="h-4 w-4" weight="bold text-[var(--text-tertiary)]" />
+                        <CaretRight className="h-4 w-4 text-[var(--text-tertiary)]" weight="bold" />
                       </button>
                     )
                   })}
@@ -689,7 +689,7 @@ export function StudioPanel({
               >
                 <Note className="h-4 w-4 mr-2 text-amber-500" weight="duotone" />
                 View All Notes ({notesCount})
-                <CaretRight className="h-4 w-4" weight="bold ml-auto text-[var(--text-tertiary)]" />
+                <CaretRight className="h-4 w-4 ml-auto text-[var(--text-tertiary)]" weight="bold" />
               </Button>
             )}
           </div>
@@ -825,7 +825,7 @@ function MaterialButton({
     >
       {icon}
       <span className="text-[var(--text-primary)]">{label}</span>
-      <CaretRight className="h-4 w-4" weight="bold ml-auto text-[var(--text-tertiary)]" />
+      <CaretRight className="h-4 w-4 ml-auto text-[var(--text-tertiary)]" weight="bold" />
     </button>
   )
 }

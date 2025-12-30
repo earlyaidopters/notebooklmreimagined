@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Plus, BookOpen, Loader2, Sparkles } from 'lucide-react'
+import { Plus, BookOpen, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { User } from '@supabase/supabase-js'
@@ -185,16 +185,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="flex flex-col items-center gap-4"
-        >
-          <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center animate-pulse">
-            <Sparkles className="h-8 w-8 text-white" />
-          </div>
-          <Loader2 className="h-6 w-6 animate-spin text-[var(--accent-primary)]" />
-        </motion.div>
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--accent-primary)]" />
       </div>
     )
   }

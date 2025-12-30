@@ -39,6 +39,18 @@ import { SourcesPanel } from '@/components/sources/sources-panel'
 import { ChatPanel } from '@/components/chat/chat-panel'
 import { StudioPanel } from '@/components/studio/studio-panel'
 import type { GenerationConfig } from '@/components/studio/generation-config-dialog'
+import {
+  useNotebook,
+  useSources,
+  useNotes,
+  useChatSessions,
+  useGeneratedAudio,
+  useGeneratedVideo,
+  useGeneratedResearch,
+  useStudyMaterials,
+  useCreativeOutputs,
+  useInvalidateNotebook,
+} from '@/lib/hooks/use-notebook-queries'
 
 // Study viewers
 import { FlashcardViewer } from '@/components/study/flashcard-viewer'
@@ -72,27 +84,31 @@ export default function NotebookPage() {
   const notebookId = params.id as string
   const supabase = createClient()
 
-  // Core state
+  // Core state - React Query for cached data
   const [user, setUser] = useState<User | null>(null)
-  const [notebook, setNotebook] = useState<Notebook | null>(null)
-  const [sources, setSources] = useState<Source[]>([])
+  const [authChecked, setAuthChecked] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [notes, setNotes] = useState<LocalNote[]>([])
-  const [loading, setLoading] = useState(true)
+
+  // React Query hooks for cached data
+  const { data: notebook, isLoading: notebookLoading } = useNotebook(notebookId)
+  const { data: sources = [], isLoading: sourcesLoading } = useSources(notebookId)
+  const { data: notes = [], isLoading: notesLoading } = useNotes(notebookId)
+  const { data: chatSessions = [], isLoading: loadingSessions } = useChatSessions(notebookId)
+  const { data: generatedAudio } = useGeneratedAudio(notebookId)
+  const { data: generatedVideo } = useGeneratedVideo(notebookId)
+  const { data: generatedResearch } = useGeneratedResearch(notebookId)
+  const { data: studyMaterialsData } = useStudyMaterials(notebookId, sources.map(s => ({ id: s.id, name: s.name })))
+  const { data: creativeOutputsData } = useCreativeOutputs(notebookId)
+  const invalidate = useInvalidateNotebook()
+
+  // Derived loading state
+  const loading = !authChecked || notebookLoading || sourcesLoading || notesLoading
 
   // Chat state
   const [sending, setSending] = useState(false)
   const [message, setMessage] = useState('')
   const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set())
   const [sessionId, setSessionId] = useState<string | null>(null)
-  const [chatSessions, setChatSessions] = useState<Array<{
-    id: string
-    title: string
-    created_at: string
-    updated_at: string
-    message_count: number
-  }>>([])
-  const [loadingSessions, setLoadingSessions] = useState(false)
 
   // Source state
   const [viewingSource, setViewingSource] = useState<Source | null>(null)
@@ -118,18 +134,23 @@ export default function NotebookPage() {
   const [researchMode, setResearchMode] = useState('fast')
   const [researching, setResearching] = useState(false)
 
-  // Study loading states
-  const [generatingFlashcards, setGeneratingFlashcards] = useState(false)
-  const [generatingQuiz, setGeneratingQuiz] = useState(false)
-  const [generatingStudyGuide, setGeneratingStudyGuide] = useState(false)
-  const [generatingFaq, setGeneratingFaq] = useState(false)
-  const [generatingMindMap, setGeneratingMindMap] = useState(false)
+  // Consolidated generating states - single object to reduce re-renders
+  const [generating, setGenerating] = useState({
+    flashcards: false,
+    quiz: false,
+    studyGuide: false,
+    faq: false,
+    mindMap: false,
+    dataTable: false,
+    report: false,
+    slideDeck: false,
+    infographic: false,
+  })
 
-  // Creative outputs loading states
-  const [generatingDataTable, setGeneratingDataTable] = useState(false)
-  const [generatingReport, setGeneratingReport] = useState(false)
-  const [generatingSlideDeck, setGeneratingSlideDeck] = useState(false)
-  const [generatingInfographic, setGeneratingInfographic] = useState(false)
+  // Helper to update single generating state
+  const setGeneratingState = (key: keyof typeof generating, value: boolean) => {
+    setGenerating(prev => ({ ...prev, [key]: value }))
+  }
 
   // Study results
   const [flashcards, setFlashcards] = useState<Array<{ id: string; front: string; back: string }>>([])
@@ -202,29 +223,10 @@ export default function NotebookPage() {
   const [isResizing, setIsResizing] = useState(false)
   const [activeStudyType, setActiveStudyType] = useState<'flashcards' | 'quiz' | 'guide' | 'faq' | 'mindmap' | 'audio' | 'video' | 'research' | 'datatable' | 'report' | 'slides' | 'infographic' | null>(null)
 
-  // Generated content state
-  const [generatedAudio, setGeneratedAudio] = useState<{
-    id: string
-    format: string
-    status: string
-    script?: string
-    audio_url?: string
-    duration_seconds?: number
-    created_at: string
-  } | null>(null)
-
-  const [generatedVideo, setGeneratedVideo] = useState<{
-    id: string
-    style: string
-    status: string
-    script?: string
-    video_url?: string
-    thumbnail_url?: string
-    duration_seconds?: number
-    created_at: string
-  } | null>(null)
-
-  const [generatedResearch, setGeneratedResearch] = useState<{
+  // Local state for newly generated content (overrides cached until next fetch)
+  const [localGeneratedAudio, setLocalGeneratedAudio] = useState<typeof generatedAudio | null>(null)
+  const [localGeneratedVideo, setLocalGeneratedVideo] = useState<typeof generatedVideo | null>(null)
+  const [localGeneratedResearch, setLocalGeneratedResearch] = useState<{
     id: string
     query: string
     mode: string
@@ -238,10 +240,15 @@ export default function NotebookPage() {
     completed_at?: string
   } | null>(null)
 
+  // Use local state if set, otherwise use cached data
+  const activeGeneratedAudio = localGeneratedAudio ?? generatedAudio
+  const activeGeneratedVideo = localGeneratedVideo ?? generatedVideo
+  const activeGeneratedResearch = localGeneratedResearch ?? generatedResearch
+
   // File input ref
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Initialize
+  // Initialize - just check auth, React Query handles data fetching
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -250,36 +257,11 @@ export default function NotebookPage() {
         return
       }
       setUser(user)
-      await Promise.all([fetchNotebook(), fetchSources(), fetchNotes()])
-      setLoading(false)
-      // Fetch study materials, generated content, creative outputs, and chat sessions after main load (non-blocking)
-      fetchStudyMaterials()
-      fetchGeneratedContent()
-      fetchCreativeOutputs()
-      fetchChatSessions()
+      setAuthChecked(true)
     }
     init()
   }, [notebookId])
 
-  // Fetch chat sessions
-  const fetchChatSessions = async () => {
-    setLoadingSessions(true)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const response = await fetch(`/api/notebooks/${notebookId}/chat/sessions`, {
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
-      })
-      const result = await response.json()
-      if (result.data) {
-        setChatSessions(result.data)
-      }
-    } catch (error) {
-      console.error('Failed to fetch chat sessions:', error)
-    }
-    setLoadingSessions(false)
-  }
 
   // Load a chat session
   const loadChatSession = async (loadSessionId: string) => {
@@ -319,8 +301,9 @@ export default function NotebookPage() {
         },
       })
       if (response.ok) {
-        setChatSessions(prev => prev.filter(s => s.id !== deleteSessionId))
-        
+        // Invalidate cache to refresh the list
+        invalidate.invalidateChatSessions(notebookId)
+
         // If we deleted the current session, start a new chat
         if (deleteSessionId === sessionId) {
           startNewChat()
@@ -379,7 +362,6 @@ export default function NotebookPage() {
         guide: 'guide',
         faq: 'faq',
         mindmap: 'mindmap',
-        notes: 'notes',
       }
       const studyType = typeMap[view]
       if (studyType) {
@@ -392,48 +374,6 @@ export default function NotebookPage() {
     }
   }, [searchParams, loading, notebookId, router])
 
-  // Fetch existing audio/video/research content
-  const fetchGeneratedContent = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-
-      // Fetch audio
-      const audioResponse = await fetch(`/api/notebooks/${notebookId}/audio`, {
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
-      })
-      const audioResult = await audioResponse.json()
-      if (audioResult.data && audioResult.data.length > 0) {
-        // Get the most recent audio
-        setGeneratedAudio(audioResult.data[0])
-      }
-
-      // Fetch video
-      const videoResponse = await fetch(`/api/notebooks/${notebookId}/video`, {
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
-      })
-      const videoResult = await videoResponse.json()
-      if (videoResult.data && videoResult.data.length > 0) {
-        setGeneratedVideo(videoResult.data[0])
-      }
-
-      // Fetch research
-      const researchResponse = await fetch(`/api/notebooks/${notebookId}/research`, {
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
-      })
-      const researchResult = await researchResponse.json()
-      if (researchResult.data && researchResult.data.length > 0) {
-        setGeneratedResearch(researchResult.data[0])
-      }
-    } catch (error) {
-      console.error('Failed to fetch generated content:', error)
-    }
-  }
 
   // Fetch existing creative outputs (data tables, reports, slides, infographics)
   const fetchCreativeOutputs = async () => {
@@ -552,41 +492,12 @@ export default function NotebookPage() {
     }
   }
 
-  const fetchNotebook = async () => {
-    const { data, error } = await supabase
-      .from('notebooks')
-      .select('*')
-      .eq('id', notebookId)
-      .single()
-
-    if (error || !data) {
-      
+  // Redirect if notebook doesn't exist
+  useEffect(() => {
+    if (!notebookLoading && !notebook) {
       router.push('/')
-      return
     }
-    setNotebook(data)
-  }
-
-  const fetchSources = async () => {
-    const { data } = await supabase
-      .from('sources')
-      .select('*')
-      .eq('notebook_id', notebookId)
-      .order('created_at', { ascending: false })
-
-    setSources(data || [])
-  }
-
-  const fetchNotes = async () => {
-    const { data } = await supabase
-      .from('notes')
-      .select('*')
-      .eq('notebook_id', notebookId)
-      .order('is_pinned', { ascending: false })
-      .order('created_at', { ascending: false })
-
-    setNotes(data || [])
-  }
+  }, [notebook, notebookLoading, router])
 
   // Source handlers
   const handleAddSource = async (type: string, data: { input: string; name?: string; file?: File }) => {
@@ -627,13 +538,9 @@ export default function NotebookPage() {
 
         if (error) {
           console.error('Source creation error:', error)
-          
         } else {
-          
-          setSources([sourceData, ...sources])
+          invalidate.invalidateSources(notebookId)
         }
-      } else {
-        
       }
     } else {
       let sourceData: Partial<Source> = {
@@ -664,17 +571,16 @@ export default function NotebookPage() {
         }
       }
 
-      const { data: newSource, error } = await supabase
+      const { error } = await supabase
         .from('sources')
         .insert(sourceData)
         .select()
         .single()
 
       if (error) {
-        
+        console.error('Source creation error:', error)
       } else {
-        
-        setSources([newSource, ...sources])
+        invalidate.invalidateSources(notebookId)
       }
     }
 
@@ -688,12 +594,11 @@ export default function NotebookPage() {
       .eq('id', sourceId)
 
     if (error) {
-      
+      console.error('Delete source error:', error)
     } else {
-      setSources(sources.filter(s => s.id !== sourceId))
+      invalidate.invalidateSources(notebookId)
       selectedSources.delete(sourceId)
       setSelectedSources(new Set(selectedSources))
-      
     }
   }
 
@@ -766,17 +671,16 @@ export default function NotebookPage() {
 
       // Refresh chat sessions if this was a new session
       if (isNewSession) {
-        fetchChatSessions()
+        invalidate.invalidateChatSessions(notebookId)
       }
     } catch {
-      
       setMessages(prev => prev.filter(m => m.id !== userMessage.id))
     }
     setSending(false)
   }
 
   const saveResponseAsNote = async (msg: ChatMessage) => {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('notes')
       .insert({
         notebook_id: notebookId,
@@ -789,10 +693,9 @@ export default function NotebookPage() {
       .single()
 
     if (error) {
-      
+      console.error('Save note error:', error)
     } else {
-      
-      setNotes([data, ...notes])
+      invalidate.invalidateNotes(notebookId)
     }
   }
 
@@ -801,7 +704,7 @@ export default function NotebookPage() {
     if (!noteTitle.trim() && !noteContent.trim()) return
 
     setSavingNote(true)
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('notes')
       .insert({
         notebook_id: notebookId,
@@ -814,10 +717,9 @@ export default function NotebookPage() {
       .single()
 
     if (error) {
-      
+      console.error('Create note error:', error)
     } else {
-      
-      setNotes([data, ...notes])
+      invalidate.invalidateNotes(notebookId)
       setNoteTitle('')
       setNoteContent('')
       setAddNoteOpen(false)
@@ -852,13 +754,13 @@ export default function NotebookPage() {
       })
       const result = await response.json()
       if (result.error) {
-        
+        console.error('Audio generation error:', result.error)
       } else if (result.data) {
-        setGeneratedAudio(result.data)
-        
+        setLocalGeneratedAudio(result.data)
+        invalidate.invalidateAudio(notebookId)
       }
-    } catch {
-      
+    } catch (error) {
+      console.error('Audio generation error:', error)
     }
     setGeneratingAudio(false)
   }
@@ -866,7 +768,6 @@ export default function NotebookPage() {
   // Video generation
   const generateVideo = async () => {
     if (selectedSources.size === 0) {
-      
       return
     }
 
@@ -889,13 +790,13 @@ export default function NotebookPage() {
       })
       const result = await response.json()
       if (result.error) {
-        
+        console.error('Video generation error:', result.error)
       } else if (result.data) {
-        setGeneratedVideo(result.data)
-        
+        setLocalGeneratedVideo(result.data)
+        invalidate.invalidateVideo(notebookId)
       }
-    } catch {
-      
+    } catch (error) {
+      console.error('Video generation error:', error)
     }
     setGeneratingVideo(false)
   }
@@ -907,7 +808,7 @@ export default function NotebookPage() {
     }
 
     // Clear old research to prevent showing cached results
-    setGeneratedResearch(null)
+    setLocalGeneratedResearch(null)
     setResearching(true)
     setActiveStudyType('research')
     setStudySheetOpen(true)
@@ -930,7 +831,8 @@ export default function NotebookPage() {
         console.error('Research failed:', result.error)
         alert(`Research failed: ${result.error}`)
       } else if (result.data) {
-        setGeneratedResearch(result.data)
+        setLocalGeneratedResearch(result.data)
+        invalidate.invalidateResearch(notebookId)
         setResearchQuery('')
       }
     } catch (error) {
@@ -942,7 +844,7 @@ export default function NotebookPage() {
 
   // Study material generation handlers
   const handleGenerateFlashcards = async () => {
-    setGeneratingFlashcards(true)
+    setGeneratingState('flashcards', true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const response = await fetch(`/api/notebooks/${notebookId}/study`, {
@@ -972,12 +874,12 @@ export default function NotebookPage() {
     } catch {
       
     } finally {
-      setGeneratingFlashcards(false)
+      setGeneratingState('flashcards', false)
     }
   }
 
   const handleGenerateQuiz = async () => {
-    setGeneratingQuiz(true)
+    setGeneratingState('quiz', true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const response = await fetch(`/api/notebooks/${notebookId}/study`, {
@@ -1008,12 +910,12 @@ export default function NotebookPage() {
     } catch {
       
     } finally {
-      setGeneratingQuiz(false)
+      setGeneratingState('quiz', false)
     }
   }
 
   const handleGenerateStudyGuide = async () => {
-    setGeneratingStudyGuide(true)
+    setGeneratingState('studyGuide', true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const response = await fetch(`/api/notebooks/${notebookId}/study`, {
@@ -1040,12 +942,12 @@ export default function NotebookPage() {
     } catch {
       
     } finally {
-      setGeneratingStudyGuide(false)
+      setGeneratingState('studyGuide', false)
     }
   }
 
   const handleGenerateFaq = async () => {
-    setGeneratingFaq(true)
+    setGeneratingState('faq', true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const response = await fetch(`/api/notebooks/${notebookId}/study`, {
@@ -1072,12 +974,12 @@ export default function NotebookPage() {
     } catch {
       
     } finally {
-      setGeneratingFaq(false)
+      setGeneratingState('faq', false)
     }
   }
 
   const handleGenerateMindMap = async () => {
-    setGeneratingMindMap(true)
+    setGeneratingState('mindMap', true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const response = await fetch(`/api/notebooks/${notebookId}/study`, {
@@ -1105,7 +1007,7 @@ export default function NotebookPage() {
     } catch {
 
     } finally {
-      setGeneratingMindMap(false)
+      setGeneratingState('mindMap', false)
     }
   }
 
@@ -1118,15 +1020,15 @@ export default function NotebookPage() {
     if (sourceIds.length === 0) return
 
     // Set loading state based on type
-    const setLoadingMap: Record<string, ((val: boolean) => void) | undefined> = {
-      'flashcards': setGeneratingFlashcards,
-      'quiz': setGeneratingQuiz,
-      'study-guide': setGeneratingStudyGuide,
-      'faq': setGeneratingFaq,
-      'mind-map': setGeneratingMindMap,
+    const typeToStateKey: Record<string, keyof typeof generating> = {
+      'flashcards': 'flashcards',
+      'quiz': 'quiz',
+      'study-guide': 'studyGuide',
+      'faq': 'faq',
+      'mind-map': 'mindMap',
     }
-    const setLoading = setLoadingMap[config.type]
-    setLoading?.(true)
+    const stateKey = typeToStateKey[config.type]
+    if (stateKey) setGeneratingState(stateKey, true)
 
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -1205,7 +1107,7 @@ export default function NotebookPage() {
     } catch (error) {
       console.error('Study material generation failed:', error)
     } finally {
-      setLoading?.(false)
+      if (stateKey) setGeneratingState(stateKey, false)
     }
   }
 
@@ -1218,14 +1120,14 @@ export default function NotebookPage() {
     if (sourceIds.length === 0) return
 
     // Set loading state based on type
-    const setLoadingMap2: Record<string, ((val: boolean) => void) | undefined> = {
-      'data_table': setGeneratingDataTable,
-      'report': setGeneratingReport,
-      'slide_deck': setGeneratingSlideDeck,
-      'infographic': setGeneratingInfographic,
+    const typeToStateKey2: Record<string, keyof typeof generating> = {
+      'data_table': 'dataTable',
+      'report': 'report',
+      'slide_deck': 'slideDeck',
+      'infographic': 'infographic',
     }
-    const setLoading2 = setLoadingMap2[config.type]
-    setLoading2?.(true)
+    const stateKey2 = typeToStateKey2[config.type]
+    if (stateKey2) setGeneratingState(stateKey2, true)
 
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -1288,17 +1190,17 @@ export default function NotebookPage() {
     } catch (error) {
       console.error('Creative output generation failed:', error)
     } finally {
-      setLoading2?.(false)
+      if (stateKey2) setGeneratingState(stateKey2, false)
     }
   }
 
   // Creative output generation handlers (legacy - kept for compatibility)
   const handleGenerateDataTable = async () => {
     if (selectedSources.size === 0) {
-      
+
       return
     }
-    setGeneratingDataTable(true)
+    setGeneratingState('dataTable', true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const response = await fetch(`/api/notebooks/${notebookId}/studio`, {
@@ -1324,16 +1226,16 @@ export default function NotebookPage() {
     } catch {
       // Error handled silently
     } finally {
-      setGeneratingDataTable(false)
+      setGeneratingState('dataTable', false)
     }
   }
 
   const handleGenerateReport = async (reportType: string) => {
     if (selectedSources.size === 0) {
-      
+
       return
     }
-    setGeneratingReport(true)
+    setGeneratingState('report', true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const response = await fetch(`/api/notebooks/${notebookId}/studio`, {
@@ -1360,16 +1262,16 @@ export default function NotebookPage() {
     } catch {
       // Error handled silently
     } finally {
-      setGeneratingReport(false)
+      setGeneratingState('report', false)
     }
   }
 
   const handleGenerateSlideDeck = async () => {
     if (selectedSources.size === 0) {
-      
+
       return
     }
-    setGeneratingSlideDeck(true)
+    setGeneratingState('slideDeck', true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const response = await fetch(`/api/notebooks/${notebookId}/studio`, {
@@ -1395,16 +1297,16 @@ export default function NotebookPage() {
     } catch {
       // Error handled silently
     } finally {
-      setGeneratingSlideDeck(false)
+      setGeneratingState('slideDeck', false)
     }
   }
 
   const handleGenerateInfographic = async () => {
     if (selectedSources.size === 0) {
-      
+
       return
     }
-    setGeneratingInfographic(true)
+    setGeneratingState('infographic', true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const response = await fetch(`/api/notebooks/${notebookId}/studio`, {
@@ -1430,7 +1332,7 @@ export default function NotebookPage() {
     } catch {
       // Error handled silently
     } finally {
-      setGeneratingInfographic(false)
+      setGeneratingState('infographic', false)
     }
   }
 
@@ -1460,18 +1362,8 @@ export default function NotebookPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="flex flex-col items-center gap-4"
-        >
-          <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center animate-pulse">
-            <Sparkles className="h-8 w-8 text-white" />
-          </div>
-          <Loader2 className="h-6 w-6 animate-spin text-[var(--accent-primary)]" />
-          <p className="text-sm text-[var(--text-tertiary)]">Loading notebook...</p>
-        </motion.div>
+      <div className="h-screen flex items-center justify-center bg-[var(--bg-primary)]">
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--accent-primary)]" />
       </div>
     )
   }
@@ -1586,16 +1478,16 @@ export default function NotebookPage() {
               onRunResearch={runResearch}
               researching={researching}
               onGenerateStudyMaterial={handleGenerateStudyMaterial}
-              generatingFlashcards={generatingFlashcards}
-              generatingQuiz={generatingQuiz}
-              generatingStudyGuide={generatingStudyGuide}
-              generatingFaq={generatingFaq}
-              generatingMindMap={generatingMindMap}
+              generatingFlashcards={generating.flashcards}
+              generatingQuiz={generating.quiz}
+              generatingStudyGuide={generating.studyGuide}
+              generatingFaq={generating.faq}
+              generatingMindMap={generating.mindMap}
               onGenerateCreativeOutput={handleGenerateCreativeOutput}
-              generatingDataTable={generatingDataTable}
-              generatingReport={generatingReport}
-              generatingSlideDeck={generatingSlideDeck}
-              generatingInfographic={generatingInfographic}
+              generatingDataTable={generating.dataTable}
+              generatingReport={generating.report}
+              generatingSlideDeck={generating.slideDeck}
+              generatingInfographic={generating.infographic}
               creativeOutputs={creativeOutputsMeta}
               onOpenCreativeOutput={(type) => {
                 const typeMap: Record<string, typeof activeStudyType> = {
@@ -1621,9 +1513,9 @@ export default function NotebookPage() {
               }}
               notesCount={notes.length}
               onAddNote={() => setAddNoteOpen(true)}
-              hasGeneratedAudio={!!generatedAudio}
-              hasGeneratedVideo={!!generatedVideo}
-              hasGeneratedResearch={!!generatedResearch}
+              hasGeneratedAudio={!!activeGeneratedAudio}
+              hasGeneratedVideo={!!activeGeneratedVideo}
+              hasGeneratedResearch={!!activeGeneratedResearch}
               onOpenAudio={() => { setActiveStudyType('audio'); setStudySheetOpen(true) }}
               onOpenVideo={() => { setActiveStudyType('video'); setStudySheetOpen(true) }}
               onOpenResearch={() => { setActiveStudyType('research'); setStudySheetOpen(true) }}
@@ -1834,7 +1726,7 @@ export default function NotebookPage() {
             {/* Audio View */}
             {activeStudyType === 'audio' && (
               <AudioPlayer
-                audio={generatedAudio}
+                audio={activeGeneratedAudio ?? null}
                 isGenerating={generatingAudio}
                 onClose={() => setStudySheetOpen(false)}
               />
@@ -1843,7 +1735,7 @@ export default function NotebookPage() {
             {/* Video View */}
             {activeStudyType === 'video' && (
               <VideoPlayer
-                video={generatedVideo}
+                video={activeGeneratedVideo ?? null}
                 isGenerating={generatingVideo}
                 onClose={() => setStudySheetOpen(false)}
               />
@@ -1852,7 +1744,7 @@ export default function NotebookPage() {
             {/* Research View */}
             {activeStudyType === 'research' && (
               <ResearchReport
-                research={generatedResearch}
+                research={activeGeneratedResearch ?? null}
                 isResearching={researching}
                 onClose={() => setStudySheetOpen(false)}
               />
