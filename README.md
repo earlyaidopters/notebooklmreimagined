@@ -117,7 +117,7 @@ Plus fine-tune preferences:
 ### 1. Clone & Setup
 
 ```bash
-git clone https://github.com/promptadvisers/notebooklmreimagined.git
+git clone https://github.com/earlyaidopters/notebooklmreimagined.git
 cd notebooklmreimagined
 ```
 
@@ -446,6 +446,6 @@ MIT License — use it however you want.
 </p>
 
 <p align="center">
-  <a href="https://github.com/promptadvisers/notebooklmreimagined/stargazers">Star us on GitHub</a> •
+  <a href="https://github.com/earlyaidopters/notebooklmreimagined/stargazers">Star us on GitHub</a> •
   <a href="https://twitter.com/promptadvisers">Follow on Twitter</a>
 </p>
