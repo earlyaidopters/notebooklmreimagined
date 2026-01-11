@@ -13,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { ThemeSelector } from '@/components/ui/theme-selector'
 import { User as SupabaseUser } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -111,6 +112,9 @@ export function DashboardHeader({
 
       {/* Right side */}
       <div className="flex items-center gap-2">
+        {/* Theme Selector */}
+        <ThemeSelector />
+
         <Button
           variant="ghost"
           size="icon"

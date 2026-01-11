@@ -3,8 +3,15 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Design System Foundation from UI Overhaul Spec */
-:root {
+/* ============================================================================
+   THEME SYSTEM - 4 Themes: Dark, Light, Midnight Blue, Crimson
+   ============================================================================ */
+
+/* Dark Theme (Default) - Deep Purple/Blue */
+:root,
+[data-theme="dark"] {
+  --theme-name: "dark";
+
   /* Primary Background */
   --bg-primary: #0f0f23;
   --bg-secondary: #1a1a2e;
@@ -35,6 +42,158 @@
   --source-video: #ffd93d;
   --source-audio: #a29bfe;
 
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 20px rgba(124, 138, 255, 0.3);
+
+  /* Border */
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.1);
+}
+
+/* Light Theme - Clean White with Soft Accents */
+[data-theme="light"] {
+  --theme-name: "light";
+
+  /* Primary Background */
+  --bg-primary: #f8f9fc;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f0f2f5;
+  --bg-surface: #e8ebf0;
+
+  /* Accent Colors */
+  --accent-primary: #5b6eea;
+  --accent-secondary: #3cb4ac;
+  --accent-tertiary: #e85d8c;
+
+  /* Text Colors */
+  --text-primary: #1a1a2e;
+  --text-secondary: #5c5c6d;
+  --text-tertiary: #9292a3;
+  --text-link: #5b6eea;
+
+  /* Semantic Colors */
+  --success: #3cb4ac;
+  --warning: #e6a800;
+  --error: #e85555;
+  --info: #4a9aea;
+
+  /* Source Type Colors */
+  --source-pdf: #e85555;
+  --source-doc: #3cb4ac;
+  --source-web: #4a9aea;
+  --source-video: #e6a800;
+  --source-audio: #8b7fea;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.15);
+  --shadow-glow: 0 0 20px rgba(91, 110, 234, 0.2);
+
+  /* Border */
+  --border: rgba(0, 0, 0, 0.1);
+  --input: rgba(0, 0, 0, 0.08);
+}
+
+/* Midnight Blue Theme - Deep Navy */
+[data-theme="midnight"] {
+  --theme-name: "midnight";
+
+  /* Primary Background */
+  --bg-primary: #0a1628;
+  --bg-secondary: #0f2341;
+  --bg-tertiary: #163058;
+  --bg-surface: #1d3d6e;
+
+  /* Accent Colors */
+  --accent-primary: #60a5fa;
+  --accent-secondary: #34d399;
+  --accent-tertiary: #f472b6;
+
+  /* Text Colors */
+  --text-primary: #f0f4f8;
+  --text-secondary: #94a3b8;
+  --text-tertiary: #64748b;
+  --text-link: #60a5fa;
+
+  /* Semantic Colors */
+  --success: #34d399;
+  --warning: #fbbf24;
+  --error: #f87171;
+  --info: #38bdf8;
+
+  /* Source Type Colors */
+  --source-pdf: #f87171;
+  --source-doc: #34d399;
+  --source-web: #38bdf8;
+  --source-video: #fbbf24;
+  --source-audio: #a78bfa;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.6);
+  --shadow-glow: 0 0 20px rgba(96, 165, 250, 0.3);
+
+  /* Border */
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.08);
+}
+
+/* Crimson Theme - Dark with Red Accents */
+[data-theme="crimson"] {
+  --theme-name: "crimson";
+
+  /* Primary Background */
+  --bg-primary: #140a0a;
+  --bg-secondary: #1f1212;
+  --bg-tertiary: #2d1919;
+  --bg-surface: #3a2020;
+
+  /* Accent Colors */
+  --accent-primary: #dc2626;
+  --accent-secondary: #f97316;
+  --accent-tertiary: #f472b6;
+
+  /* Text Colors */
+  --text-primary: #fef2f2;
+  --text-secondary: #d4a5a5;
+  --text-tertiary: #8b6b6b;
+  --text-link: #ef4444;
+
+  /* Semantic Colors */
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --info: #3b82f6;
+
+  /* Source Type Colors */
+  --source-pdf: #ef4444;
+  --source-doc: #22c55e;
+  --source-web: #3b82f6;
+  --source-video: #f59e0b;
+  --source-audio: #a855f7;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.6);
+  --shadow-glow: 0 0 20px rgba(220, 38, 38, 0.3);
+
+  /* Border */
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.08);
+}
+
+/* Shared Variables (apply to all themes) */
+:root {
   /* Spacing */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -55,13 +214,6 @@
   --radius-2xl: 24px;
   --radius-full: 9999px;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.4);
-  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 20px rgba(124, 138, 255, 0.3);
-
   /* Shadcn compatible vars */
   --radius: 0.625rem;
   --background: var(--bg-primary);
@@ -79,8 +231,6 @@
   --accent: var(--bg-tertiary);
   --accent-foreground: var(--text-primary);
   --destructive: var(--error);
-  --border: rgba(255, 255, 255, 0.1);
-  --input: rgba(255, 255, 255, 0.1);
   --ring: var(--accent-primary);
   --chart-1: var(--accent-primary);
   --chart-2: var(--accent-secondary);
@@ -93,7 +243,7 @@
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: var(--bg-tertiary);
   --sidebar-accent-foreground: var(--text-primary);
-  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-border: var(--border);
   --sidebar-ring: var(--accent-primary);
 }
 
@@ -145,9 +295,10 @@
     @apply border-border outline-ring/50;
   }
   html, body {
-    background-color: #0f0f23;
-    color: #ffffff;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 }
 

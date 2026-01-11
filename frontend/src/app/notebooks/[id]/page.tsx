@@ -28,7 +28,7 @@ import {
   ArrowLeft, Loader2, Sparkles, X, RotateCcw,
   BookOpen, ListChecks, FileText, HelpCircle, Mic, Video, Search, Share2,
   Maximize2, Minimize2, Table, FileSpreadsheet, Presentation, Image as ImageIcon,
-  History, Settings
+  History, Settings, Download
 } from 'lucide-react'
 // Toast notifications removed per user request
 // import { toast } from 'sonner'
@@ -39,7 +39,7 @@ import { SourcesPanel } from '@/components/sources/sources-panel'
 import { ChatPanel } from '@/components/chat/chat-panel'
 import { StudioPanel, ExportOptionsState } from '@/components/studio/studio-panel'
 import type { GenerationConfig } from '@/components/studio/generation-config-dialog'
-import { exportNotebook } from '@/lib/export-utils'
+import { exportNotebook, exportSlideDeckToPPTX, exportReportToDocx, SlideDeckData, ReportData } from '@/lib/export-utils'
 import {
   useNotebook,
   useSources,
@@ -1884,6 +1884,21 @@ export default function NotebookPage() {
             {/* Report View */}
             {activeStudyType === 'report' && reportData && (
               <div className="space-y-6">
+                {/* Export Button */}
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      exportReportToDocx(reportData as ReportData, reportData.title.replace(/[^a-zA-Z0-9]/g, '_'))
+                    }}
+                  >
+                    <Download className="h-4 w-4" />
+                    Download as Word
+                  </Button>
+                </div>
                 <div className="p-4 rounded-xl bg-[var(--bg-tertiary)]">
                   <h2 className="text-xl font-bold text-[var(--text-primary)] mb-4">{reportData.title}</h2>
                   <div className="p-4 rounded-lg bg-[var(--accent-primary)]/10 border border-[var(--accent-primary)]/20 mb-6">
@@ -1911,6 +1926,21 @@ export default function NotebookPage() {
             {/* Slide Deck View */}
             {activeStudyType === 'slides' && slideDeckData && (
               <div className="space-y-4">
+                {/* Export Button */}
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      exportSlideDeckToPPTX(slideDeckData as SlideDeckData, slideDeckData.title.replace(/[^a-zA-Z0-9]/g, '_'))
+                    }}
+                  >
+                    <Download className="h-4 w-4" />
+                    Download as PowerPoint
+                  </Button>
+                </div>
                 <div className="text-center mb-6">
                   <h2 className="text-xl font-bold text-[var(--text-primary)]">{slideDeckData.title}</h2>
                   {slideDeckData.subtitle && (
