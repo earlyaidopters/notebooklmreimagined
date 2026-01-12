@@ -39,7 +39,9 @@ import { SourcesPanel } from '@/components/sources/sources-panel'
 import { ChatPanel } from '@/components/chat/chat-panel'
 import { StudioPanel, ExportOptionsState } from '@/components/studio/studio-panel'
 import type { GenerationConfig } from '@/components/studio/generation-config-dialog'
-import { exportNotebook, exportSlideDeckToPPTX, exportReportToDocx, SlideDeckData, ReportData } from '@/lib/export-utils'
+import { exportNotebook, exportSlideDeckToPPTX, exportReportToDocx, exportDataTableToCSV, SlideDeckData, ReportData, DataTableExportData } from '@/lib/export-utils'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import {
   useNotebook,
   useSources,
@@ -1850,6 +1852,21 @@ export default function NotebookPage() {
             {/* Data Table View */}
             {activeStudyType === 'datatable' && dataTableData && (
               <div className="space-y-4">
+                {/* Export Button */}
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      exportDataTableToCSV(dataTableData as DataTableExportData, dataTableData.title.replace(/[^a-zA-Z0-9]/g, '_'))
+                    }}
+                  >
+                    <Download className="h-4 w-4" />
+                    Download as CSV
+                  </Button>
+                </div>
                 <div className="p-4 rounded-xl bg-[var(--bg-tertiary)]">
                   <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">{dataTableData.title}</h3>
                   <p className="text-sm text-[var(--text-secondary)] mb-4">{dataTableData.description}</p>
@@ -1903,12 +1920,20 @@ export default function NotebookPage() {
                   <h2 className="text-xl font-bold text-[var(--text-primary)] mb-4">{reportData.title}</h2>
                   <div className="p-4 rounded-lg bg-[var(--accent-primary)]/10 border border-[var(--accent-primary)]/20 mb-6">
                     <h3 className="text-sm font-semibold text-[var(--accent-primary)] mb-2">Executive Summary</h3>
-                    <p className="text-sm text-[var(--text-secondary)]">{reportData.executive_summary}</p>
+                    <div className="text-sm text-[var(--text-secondary)] prose prose-sm prose-invert max-w-none">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {reportData.executive_summary}
+                      </ReactMarkdown>
+                    </div>
                   </div>
                   {reportData.sections.map((section, idx) => (
                     <div key={idx} className="mb-6">
                       <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">{section.heading}</h3>
-                      <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">{section.content}</p>
+                      <div className="text-sm text-[var(--text-secondary)] prose prose-sm prose-invert max-w-none [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_p]:my-2 [&_strong]:font-semibold [&_strong]:text-[var(--text-primary)]">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {section.content}
+                        </ReactMarkdown>
+                      </div>
                     </div>
                   ))}
                   <div className="mt-6 p-4 rounded-lg bg-[var(--bg-secondary)]">

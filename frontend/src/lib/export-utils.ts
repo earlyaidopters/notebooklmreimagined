@@ -634,6 +634,49 @@ export async function exportMindMapToPNG(
 }
 
 // ============================================================================
+// CSV Export
+// ============================================================================
+
+/**
+ * Data table structure for CSV export
+ */
+export interface DataTableExportData {
+  title: string
+  description?: string
+  columns: Array<{ header: string; key: string; type?: string }>
+  rows: Array<Record<string, string | number | boolean>>
+}
+
+/**
+ * Export data table to CSV file
+ */
+export function exportDataTableToCSV(
+  data: DataTableExportData,
+  filename = 'data-table'
+): void {
+  // Build CSV content
+  const headers = data.columns.map(col => `"${col.header.replace(/"/g, '""')}"`)
+  const csvLines = [headers.join(',')]
+
+  for (const row of data.rows) {
+    const values = data.columns.map(col => {
+      const value = row[col.key]
+      if (value === null || value === undefined) return ''
+      if (typeof value === 'string') {
+        // Escape quotes and wrap in quotes
+        return `"${value.replace(/"/g, '""')}"`
+      }
+      return String(value)
+    })
+    csvLines.push(values.join(','))
+  }
+
+  const csvContent = csvLines.join('\n')
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  downloadBlob(blob, `${filename}.csv`)
+}
+
+// ============================================================================
 // Generic Utilities
 // ============================================================================
 
