@@ -17,11 +17,11 @@
 </p>
 
 <p align="center">
-  <a href="#-30-second-demo">30s Demo</a> •
-  <a href="#-n8n--zapier-integration">n8n / Zapier</a> •
-  <a href="#-api-reference">API Reference</a> •
-  <a href="#-self-hosting">Self-Hosting</a> •
-  <a href="#-features">Features</a>
+  <a href="#new-here-start-here">Beginners</a> •
+  <a href="#30-second-demo">30s Demo</a> •
+  <a href="#features">Features</a> •
+  <a href="#api-reference">API Reference</a> •
+  <a href="#self-hosting">Self-Hosting</a>
 </p>
 
 ---
@@ -64,6 +64,71 @@ Google's NotebookLM is a black box:
 | No customization | **AI personas, custom prompts** |
 | No export | **ZIP, JSON, PDF export** |
 | Closed source | **MIT licensed** |
+
+---
+
+## New Here? Start Here
+
+### What is this?
+
+**NotebookLM** is Google's AI research assistant that lets you upload documents and chat with them. Think of it like ChatGPT, but it only answers based on YOUR documents — no hallucinations from random internet data.
+
+**NotebookLM Reimagined** is an open-source version you can:
+- Use via our **web app** (no coding required)
+- Control via **API** (for developers)
+- **Self-host** on your own servers
+
+### What can I do with it?
+
+| I want to... | How |
+|--------------|-----|
+| Chat with my PDFs, articles, YouTube videos | Upload sources → Ask questions |
+| Generate a podcast from my research | Upload sources → Click "Audio Overview" |
+| Create flashcards for studying | Upload sources → Click "Flashcards" |
+| Build an AI app with my own data | Use the API endpoints |
+| Automate research workflows | Connect to n8n/Zapier |
+
+### Try it now (no code)
+
+1. **Visit the web app:** [notebooklm-reimagined.vercel.app](https://notebooklm-reimagined.vercel.app)
+2. **Create an account** (free)
+3. **Create a notebook** and add some sources (paste text, URLs, or upload PDFs)
+4. **Start chatting** — the AI will answer based only on your sources
+
+### Common Questions
+
+<details>
+<summary><strong>Do I need to know how to code?</strong></summary>
+
+No! The web app works just like Google's NotebookLM. The API and self-hosting options are for developers who want more control.
+</details>
+
+<details>
+<summary><strong>Is it free?</strong></summary>
+
+The software is free and open source (MIT license). You'll need your own API keys for AI services (Google Gemini, Supabase) if self-hosting. Our hosted version has usage limits on the free tier.
+</details>
+
+<details>
+<summary><strong>What's the difference from Google's NotebookLM?</strong></summary>
+
+Google's version is a closed product — you can't access it via API, automate it, or run it on your own servers. This project gives you full control: API access, automation support, and self-hosting.
+</details>
+
+<details>
+<summary><strong>What AI models does it use?</strong></summary>
+
+- **Chat:** Google Gemini 2.5 Flash (fast) or Pro (quality)
+- **Audio podcasts:** Gemini TTS (text-to-speech)
+- **Video:** Google Veo
+- All models are configurable per request
+</details>
+
+<details>
+<summary><strong>Is my data private?</strong></summary>
+
+If self-hosted: 100% private, your data never leaves your servers. On our hosted version: data is stored in Supabase with row-level security (each user can only access their own data).
+</details>
 
 ---
 
