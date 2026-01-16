@@ -1,9 +1,0 @@
-{"type":"summary","summary":"Reconfigure MCP servers: remove magic/firecrawl, move vercel to project","leafUuid":"94a74c9b-86be-4b58-8e11-52adae1b89f0"}
-{"type":"summary","summary":"Removed MCPs, converted Vercel to project-level","leafUuid":"760bf3c7-1cc0-4a00-af25-3e1358e239e0"}
-{"type":"summary","summary":"Remove magic, firecrawl MCPs; move Vercel","leafUuid":"e3a0322d-577a-4728-905a-72e1becca8a6"}
-{"type":"summary","summary":"Removed MCPs, moved Vercel to project level","leafUuid":"bff004dd-c43f-4cf5-9073-8f1de6ac3330"}
-{"type":"summary","summary":"Remove MCPs, migrate Vercel to project level","leafUuid":"a90866d0-377a-46b9-b681-194fa2b19d04"}
-{"type":"summary","summary":"Reconfigure MCP servers: Remove magic/firecrawl, move Vercel","leafUuid":"aeef496f-56a3-4bce-aa93-3e7e1717fbbb"}
-{"type":"summary","summary":"Remove MCPs and reconfigure Vercel project settings","leafUuid":"2a949114-7ee1-4cc8-8601-ea68383dfeee"}
-{"type":"summary","summary":"Removing MCPs and reconfiguring global settings","leafUuid":"a74bc3ec-fc48-4b49-b316-3c2adda7e8e2"}
-{"type":"summary","summary":"MCP Configuration: Remove magic/firecrawl, manage Vercel/Supabase globally","leafUuid":"ae94ab0f-6d5d-4151-87a2-094973316c2c"}
