@@ -7,7 +7,7 @@ import hashlib
 from datetime import datetime
 
 from app.config import get_settings
-from app.routers import notebooks, sources, chat, audio, video, research, study, notes, api_keys, global_chat, studio, export, profile
+from app.routers import notebooks, sources, chat, audio, video, research, study, notes, api_keys, global_chat, studio, export, profile, providers
 
 settings = get_settings()
 
@@ -146,6 +146,7 @@ app.include_router(studio.router, prefix="/api/v1")
 app.include_router(global_chat.router, prefix="/api/v1")
 app.include_router(export.router, prefix="/api/v1")
 app.include_router(profile.router, prefix="/api/v1")
+app.include_router(providers.router, prefix="/api/v1")
 
 
 @app.get("/")
