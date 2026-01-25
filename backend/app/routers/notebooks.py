@@ -14,12 +14,91 @@ from app.services.supabase_client import get_supabase_client
 router = APIRouter(prefix="/notebooks", tags=["notebooks"])
 
 
-@router.post("", response_model=ApiResponse)
+@router.post(
+    "",
+    response_model=ApiResponse,
+    summary="Create a new notebook",
+    description="""Create a new research notebook for organizing sources and AI-powered conversations.
+
+## Request Body
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `name` | string | Yes | - | Notebook name |
+| `description` | string | No | null | Optional description |
+| `emoji` | string | No | "📓" | Notebook icon/emoji |
+
+## Response Format
+
+```json
+{
+  "data": {
+    "id": "uuid",
+    "user_id": "uuid",
+    "name": "My Research Notebook",
+    "description": "Research on AI topics",
+    "emoji": "📓",
+    "settings": {},
+    "file_search_store_id": null,
+    "source_count": 0,
+    "created_at": "2024-01-15T10:30:00Z",
+    "updated_at": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+## Notebook Settings
+
+Notebooks support customizable settings for AI behavior:
+- **Persona**: Custom AI personality and response style
+- **Tone**: Formal, casual, academic, etc.
+- **Language**: Response language preference
+- **Complexity**: Response complexity level
+
+Settings can be updated via the PATCH endpoint.
+""",
+    responses={
+        200: {
+            "description": "Notebook created successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "data": {
+                            "id": "550e8400-e29b-41d4-a716-446655440000",
+                            "user_id": "440e8400-e29b-41d4-a716-446655440000",
+                            "name": "AI Research Notebook",
+                            "description": "Research on artificial intelligence",
+                            "emoji": "🤖",
+                            "settings": {},
+                            "file_search_store_id": None,
+                            "source_count": 0,
+                            "created_at": "2024-01-15T10:30:00Z",
+                            "updated_at": "2024-01-15T10:30:00Z"
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "Invalid request data",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": {
+                            "code": 400,
+                            "message": "Failed to create notebook"
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
 async def create_notebook(
     notebook: NotebookCreate,
     user: dict = Depends(get_current_user),
 ):
-    """Create a new notebook."""
+    """Create a new notebook for organizing research sources and conversations."""
     supabase = get_supabase_client()
 
     # Create notebook record
