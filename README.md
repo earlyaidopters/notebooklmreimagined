@@ -1,6 +1,6 @@
 <p align="center">
   <img src="https://img.shields.io/badge/API-Live-success?style=for-the-badge&logo=vercel" alt="API Live">
-  <img src="https://img.shields.io/badge/Gemini-2.5-blue?style=for-the-badge&logo=google" alt="Gemini">
+  <img src="https://img.shields.io/badge/Multi--LLM-100%2B%20Models-blue?style=for-the-badge" alt="Multi-LLM">
   <img src="https://img.shields.io/badge/n8n-Ready-orange?style=for-the-badge&logo=n8n" alt="n8n Ready">
   <img src="https://img.shields.io/badge/Zapier-Compatible-orange?style=for-the-badge&logo=zapier" alt="Zapier">
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
@@ -77,6 +77,7 @@ Google's NotebookLM is a black box:
 - Use via our **web app** (no coding required)
 - Control via **API** (for developers)
 - **Self-host** on your own servers
+- **Choose your AI provider** - Google Gemini, OpenRouter (100+ models), or both!
 
 ### What can I do with it?
 
@@ -118,7 +119,16 @@ Google's version is a closed product — you can't access it via API, automate i
 <details>
 <summary><strong>What AI models does it use?</strong></summary>
 
-- **Chat:** Google Gemini 2.5 Flash (fast) or Pro (quality)
+**Default Provider:** Google Gemini 2.5 Flash (fast) or Pro (quality)
+
+**Multi-Provider Support:** OpenRouter integration gives you access to 100+ AI models including:
+- **Claude 3.5 Sonnet, Claude 3 Opus** (Anthropic)
+- **GPT-4, GPT-4 Turbo** (OpenAI)
+- **Llama 3.1 70B** (Meta)
+- **Gemini 2.0/2.5 Flash/Pro** (Google)
+- And 90+ more models
+
+**Other capabilities:**
 - **Audio podcasts:** Gemini TTS (text-to-speech)
 - **Video:** Google Veo
 - All models are configurable per request
@@ -249,6 +259,79 @@ curl -X GET "https://notebooklm-api.vercel.app/api/v1/notebooks/YOUR_NOTEBOOK_ID
 
 ---
 
+## Multi-Provider LLM Support
+
+NotebookLM Reimagined supports multiple AI providers, giving you flexibility in model selection, cost optimization, and performance.
+
+### Available Providers
+
+**Google Gemini** (Default)
+- `gemini-2.0-flash` - Fast, cost-effective
+- `gemini-2.0-flash-lite` - Ultra-lightweight
+- `gemini-2.5-pro` - High quality reasoning
+- `gemini-2.5-flash` - Balanced speed and quality
+
+**OpenRouter** (100+ models)
+- Anthropic: `claude-3.5-sonnet`, `claude-3-opus`
+- OpenAI: `gpt-4`, `gpt-4-turbo`
+- Google: `gemini-2.0-flash`, `gemini-2.5-flash`, `gemini-2.5-pro`
+- Meta: `llama-3.1-70b`
+- And 90+ more models
+
+### Provider Selection
+
+You can specify the provider per chat request:
+
+```bash
+# Use Google Gemini (default)
+curl -X POST "https://notebooklm-api.vercel.app/api/v1/notebooks/{id}/chat" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Summarize the key points",
+    "provider": "google",
+    "model": "gemini-2.5-flash"
+  }'
+
+# Use OpenRouter with Claude
+curl -X POST "https://notebooklm-api.vercel.app/api/v1/notebooks/{id}/chat" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Analyze this in depth",
+    "provider": "openrouter",
+    "provider_model": "anthropic/claude-3.5-sonnet"
+  }'
+```
+
+### Setting a Default Provider
+
+Set the `DEFAULT_LLM_PROVIDER` environment variable:
+
+```bash
+# Use OpenRouter as default
+DEFAULT_LLM_PROVIDER=openrouter
+OPENROUTER_DEFAULT_MODEL=anthropic/claude-3.5-sonnet
+```
+
+### Listing Available Models
+
+```bash
+# List all providers
+curl -X GET "https://notebooklm-api.vercel.app/api/providers" \
+  -H "X-API-Key: YOUR_API_KEY"
+
+# List all OpenRouter models
+curl -X GET "https://notebooklm-api.vercel.app/api/providers/models" \
+  -H "X-API-Key: YOUR_API_KEY"
+
+# Get current configuration
+curl -X GET "https://notebooklm-api.vercel.app/api/providers/config" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+---
+
 ## API Reference
 
 ### Base URL
@@ -273,7 +356,8 @@ Every response includes cost transparency:
     "input_tokens": 1500,
     "output_tokens": 500,
     "cost_usd": 0.002,
-    "model_used": "gemini-2.5-flash"
+    "model_used": "gemini-2.5-flash",
+    "provider": "google"
   }
 }
 ```
@@ -303,7 +387,7 @@ Every response includes cost transparency:
 #### Chat
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/v1/notebooks/{id}/chat` | Send message |
+| `POST` | `/api/v1/notebooks/{id}/chat` | Send message (supports `provider`, `provider_model` params) |
 | `GET` | `/api/v1/notebooks/{id}/chat/sessions` | List chat threads |
 | `POST` | `/api/v1/notebooks/{id}/chat/sessions` | Create thread |
 | `DELETE` | `/api/v1/notebooks/{id}/chat/sessions/{sid}` | Delete thread |
@@ -334,6 +418,13 @@ Every response includes cost transparency:
 | `GET` | `/api/v1/api-keys` | List API keys |
 | `POST` | `/api/v1/api-keys` | Create API key |
 | `DELETE` | `/api/v1/api-keys/{id}` | Revoke API key |
+
+#### Providers (Multi-LLM Support)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/providers` | List available providers |
+| `GET` | `/api/providers/config` | Get provider configuration |
+| `GET` | `/api/providers/models` | List OpenRouter models |
 
 ---
 
@@ -409,6 +500,12 @@ SUPABASE_URL=https://xxx.supabase.co
 SUPABASE_ANON_KEY=eyJ...
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
 GOOGLE_API_KEY=AIza...
+
+# Optional: OpenRouter Multi-LLM Support
+OPENROUTER_API_KEY=sk-or-...
+DEFAULT_LLM_PROVIDER=google  # or "openrouter"
+OPENROUTER_DEFAULT_MODEL=anthropic/claude-3.5-sonnet
+OPENROUTER_PROVIDER=  # Optional: specific OpenRouter provider
 ```
 
 **Frontend:**
@@ -506,6 +603,7 @@ NEXT_PUBLIC_API_URL=https://your-api.vercel.app
 - [x] **API deployment (Vercel)**
 - [x] **n8n / Zapier ready**
 - [x] **DX improvements** (Prettier, ESLint, Husky, HTTP caching)
+- [x] **Multi-LLM provider support** (OpenRouter integration with 100+ models)
 - [ ] Streaming responses
 - [ ] Collaborative notebooks
 - [ ] Webhooks
@@ -578,5 +676,6 @@ MIT — do whatever you want.
 <p align="center">
   <a href="https://github.com/earlyaidopters/notebooklmreimagined">GitHub</a> •
   <a href="https://notebooklm-api.vercel.app/docs">API Docs</a> •
-  <a href="https://twitter.com/promptadvisers">Twitter</a>
+  <a href="https://twitter.com/promptadvisers">Twitter</a> •
+  <a href="docs/PROVIDERS.md">Multi-LLM Guide</a>
 </p>

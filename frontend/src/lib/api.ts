@@ -109,7 +109,7 @@ async function getAuthToken(): Promise<string | null> {
 }
 
 // Fetch wrapper with auth
-async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
+export async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
   const token = await getAuthToken();
 
   const headers: HeadersInit = {
@@ -403,3 +403,7 @@ export const apiKeysApi = {
     });
   },
 };
+
+// Re-export providers API for convenience
+export { providersApi } from './api/providers';
+export * from './types/providers';

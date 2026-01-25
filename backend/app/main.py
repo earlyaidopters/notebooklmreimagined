@@ -5,12 +5,17 @@ from fastapi.responses import JSONResponse
 import uuid
 import hashlib
 from datetime import datetime
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from app.config import get_settings
 from app.routers import notebooks, sources, chat, audio, video, research, study, notes, api_keys, global_chat, studio, export, profile, providers
 
 settings = get_settings()
 
+# Rate limiter configuration
+limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(
     title=settings.app_name,
     description="NotebookLM Reimagined - An API-first research intelligence platform",
@@ -18,6 +23,33 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# Register rate limit exception handler with custom JSON response
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+    """Custom rate limit exceeded handler with proper JSON error response."""
+    return JSONResponse(
+        status_code=429,
+        content={
+            "error": {
+                "code": 429,
+                "message": "Rate limit exceeded",
+                "details": str(exc.detail),
+            }
+        },
+        headers={
+            "Retry-After": "60",
+        },
+    )
+
+
+# Note: providers router uses optional authentication via get_optional_user
+# Initialize the providers router with the limiter
+providers.set_limiter(limiter)
+providers.setup_rate_limiting()
 
 # GZip compression for responses > 1KB
 app.add_middleware(GZipMiddleware, minimum_size=1000)

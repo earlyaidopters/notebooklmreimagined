@@ -1,0 +1,152 @@
+# Release Workflow - Create releases with semantic versioning
+# Triggered when merging to main branch
+
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (e.g., v1.0.0)'
+        required: true
+        type: string
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '20'
+
+jobs:
+  # Job 1: Determine version
+  version:
+    name: Determine Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            # Auto-generate version based on commits
+            VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+            VERSION="v$(echo $VERSION | awk -F. '{print $1"."$2"."$3+1}')"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          cat > CHANGELOG.md << 'EOF'
+          # Changes in ${{ steps.version.outputs.version }}
+          EOF
+          git log --pretty=format:"- %s" $(git describe --tags --abbrev=0 2>/dev/null || echo "")..HEAD >> CHANGELOG.md || true
+          echo "changelog=$(cat CHANGELOG.md)" >> $GITHUB_OUTPUT
+
+      - name: Upload changelog
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog
+          path: CHANGELOG.md
+
+  # Job 2: Deploy backend
+  deploy-backend:
+    name: Deploy Backend
+    runs-on: ubuntu-latest
+    needs: version
+    environment:
+      name: production-backend
+      url: ${{ secrets.BACKEND_URL }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install deployment tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install uvicorn mangum
+
+      - name: Deploy to production
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          echo "Deploying backend version ${{ needs.version.outputs.version }}"
+          # Add deployment commands here
+
+  # Job 3: Deploy frontend
+  deploy-frontend:
+    name: Deploy Frontend
+    runs-on: ubuntu-latest
+    needs: version
+    environment:
+      name: production-frontend
+      url: ${{ secrets.FRONTEND_URL }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Deploy frontend to Vercel
+        working-directory: ./frontend
+        run: |
+          vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+  # Job 4: Create GitHub release
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [version, deploy-backend, deploy-frontend]
+    permissions:
+      contents: write
+    steps:
+      - name: Download changelog
+        uses: actions/download-artifact@v4
+        with:
+          name: changelog
+
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.version.outputs.version }}
+          name: Release ${{ needs.version.outputs.version }}
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Job 5: Notify deployment
+  notify:
+    name: Notify Deployment
+    runs-on: ubuntu-latest
+    needs: [version, deploy-backend, deploy-frontend, create-release]
+    if: always()
+    steps:
+      - name: Send notification
+        run: |
+          echo "Release ${{ needs.version.outputs.version }} completed"
+          echo "Backend: ${{ needs.deploy-backend.result }}"
+          echo "Frontend: ${{ needs.deploy-frontend.result }}"
+          echo "Release: ${{ needs.create-release.result }}"

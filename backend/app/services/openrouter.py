@@ -1,7 +1,15 @@
 import httpx
+import logging
 from typing import Optional, List, Dict, Any
+from pydantic import ValidationError, Field
 from app.config import get_settings
+from app.models.schemas import (
+    ALLOWED_OPENROUTER_MODELS,
+    OpenRouterGenerateRequest,
+    OpenRouterContextRequest
+)
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 # OpenRouter pricing (per 1M tokens - approximate)
@@ -48,7 +56,33 @@ class OpenRouterService:
         temperature: float = 0.7,
         max_tokens: int = 4096,
     ) -> Dict[str, Any]:
-        """Generate content using OpenRouter."""
+        """Generate content using OpenRouter.
+
+        Security: Validates all inputs against Pydantic schema and model allowlist.
+        Error messages are sanitized to prevent information disclosure.
+        """
+
+        # Validate request parameters using Pydantic schema
+        try:
+            validated_request = OpenRouterGenerateRequest(
+                prompt=prompt,
+                model_name=model_name,
+                provider=provider,
+                system_instruction=system_instruction,
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+        except ValidationError as e:
+            logger.warning(f"Invalid generation request: {e}")
+            raise ValueError("Invalid request parameters. Please check your input.") from e
+
+        # Validate model name against allowlist
+        if validated_request.model_name not in ALLOWED_OPENROUTER_MODELS:
+            logger.warning(f"Blocked unauthorized model: {validated_request.model_name}")
+            raise ValueError(
+                f"Model '{validated_request.model_name}' is not authorized. "
+                f"Please use one of the allowed models."
+            )
 
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -60,39 +94,55 @@ class OpenRouterService:
         # Build messages array
         messages = []
 
-        if system_instruction:
+        if validated_request.system_instruction:
             messages.append({
                 "role": "system",
-                "content": system_instruction
+                "content": validated_request.system_instruction
             })
 
         messages.append({
             "role": "user",
-            "content": prompt
+            "content": validated_request.prompt
         })
 
         # Build request payload
         payload = {
-            "model": model_name,
+            "model": validated_request.model_name,
             "messages": messages,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
+            "temperature": validated_request.temperature,
+            "max_tokens": validated_request.max_tokens,
         }
 
         # Add provider filter if specified
-        if provider:
+        if validated_request.provider:
             payload["provider"] = {
-                "order": [provider]
+                "order": [validated_request.provider]
             }
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                f"{self.base_url}/chat/completions",
-                headers=headers,
-                json=payload
-            )
-            response.raise_for_status()
-            data = response.json()
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    f"{self.base_url}/chat/completions",
+                    headers=headers,
+                    json=payload
+                )
+                response.raise_for_status()
+                data = response.json()
+
+        except httpx.HTTPStatusError as e:
+            # Sanitized error message - don't expose internal details
+            logger.error(f"OpenRouter API error: {e.response.status_code}")
+            raise ValueError(f"Content generation failed. Please try again later.") from e
+
+        except httpx.RequestError as e:
+            # Sanitized error message - don't expose connection details
+            logger.error(f"OpenRouter request error: {e}")
+            raise ValueError("Failed to connect to content generation service.") from e
+
+        except Exception as e:
+            # Generic sanitized error for unexpected issues
+            logger.error(f"Unexpected error in generate_content: {e}")
+            raise ValueError("An unexpected error occurred during content generation.") from e
 
         # Extract response data
         choice = data["choices"][0]
@@ -104,7 +154,7 @@ class OpenRouterService:
         output_tokens = usage.get("completion_tokens", 0)
 
         # Calculate cost
-        cost = calculate_cost(model_name, input_tokens, output_tokens)
+        cost = calculate_cost(validated_request.model_name, input_tokens, output_tokens)
 
         return {
             "content": content,
@@ -112,7 +162,7 @@ class OpenRouterService:
                 "input_tokens": input_tokens,
                 "output_tokens": output_tokens,
                 "cost_usd": cost,
-                "model_used": model_name,
+                "model_used": validated_request.model_name,
                 "provider": data.get("provider", "openrouter"),
             },
             "raw_response": data,
@@ -127,36 +177,61 @@ class OpenRouterService:
         source_names: Optional[List[str]] = None,
         persona_instructions: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Generate content with document context for RAG."""
+        """Generate content with document context for RAG.
+
+        Security: Validates all inputs against Pydantic schema and model allowlist.
+        Error messages are sanitized to prevent information disclosure.
+        """
         base_instruction = """You are a helpful research assistant. Answer questions based on the provided sources.
 Always cite your sources using [1], [2], etc. notation when referencing specific information.
 If the information is not in the sources, say so clearly.
 Be concise but thorough."""
 
+        # Validate request parameters using Pydantic schema
+        try:
+            validated_request = OpenRouterContextRequest(
+                message=message,
+                context=context,
+                model_name=model_name,
+                provider=provider,
+                source_names=source_names,
+                persona_instructions=persona_instructions
+            )
+        except ValidationError as e:
+            logger.warning(f"Invalid context request: {e}")
+            raise ValueError("Invalid request parameters. Please check your input.") from e
+
+        # Validate model name against allowlist
+        if validated_request.model_name not in ALLOWED_OPENROUTER_MODELS:
+            logger.warning(f"Blocked unauthorized model: {validated_request.model_name}")
+            raise ValueError(
+                f"Model '{validated_request.model_name}' is not authorized. "
+                f"Please use one of the allowed models."
+            )
+
         # Prepend persona instructions if provided
-        if persona_instructions:
-            system_instruction = f"{persona_instructions}\n\n{base_instruction}"
+        if validated_request.persona_instructions:
+            system_instruction = f"{validated_request.persona_instructions}\n\n{base_instruction}"
         else:
             system_instruction = base_instruction
 
         source_context = ""
-        if source_names:
-            for i, name in enumerate(source_names, 1):
+        if validated_request.source_names:
+            for i, name in enumerate(validated_request.source_names, 1):
                 source_context += f"[{i}] Source: {name}\n"
 
-        prompt = f"""Sources:
-{context}
+        # Construct user message with context - more reliable format
+        user_message = f"""Context sources:
+{validated_request.context}
 
-{source_context}
+{source_context}Question: {validated_request.message}
 
-User Question: {message}
-
-Provide a well-cited response:"""
+Please answer based on the provided context sources, citing your sources."""
 
         return await self.generate_content(
-            prompt=prompt,
-            model_name=model_name,
-            provider=provider,
+            prompt=user_message,
+            model_name=validated_request.model_name,
+            provider=validated_request.provider,
             system_instruction=system_instruction,
         )
 

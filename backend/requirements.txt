@@ -12,3 +12,4 @@ sse-starlette>=2.0.0
 python-jose[cryptography]>=3.3.0
 aiofiles>=23.2.1
 mangum>=0.17.0
+slowapi>=0.1.9
