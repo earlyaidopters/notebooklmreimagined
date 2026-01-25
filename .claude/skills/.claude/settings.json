@@ -1,0 +1,16 @@
+{
+  "skills": {
+    "implement-chat-threads": {
+      "description": "Implement enhanced chat threads UI with sidebar, rename, search, and thread switching. Run this in a dedicated terminal - it has full context baked in.",
+      "path": ".claude/skills/implement-chat-threads.md"
+    },
+    "implement-notebook-export": {
+      "description": "Implement full notebook export (ZIP/PDF) with all sources, chats, notes, and generated content. Run this in a dedicated terminal - it has full context baked in.",
+      "path": ".claude/skills/implement-notebook-export.md"
+    },
+    "implement-notebook-personas": {
+      "description": "Implement persistent notebook instructions/personas that apply to all AI responses. Run this in a dedicated terminal - it has full context baked in.",
+      "path": ".claude/skills/implement-notebook-personas.md"
+    }
+  }
+}

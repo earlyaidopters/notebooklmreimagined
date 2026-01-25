@@ -1,0 +1,15 @@
+*.tmp
+.cache/
+
+# Private/local folders
+youtube/
+
+# Claude Code internal files (keep project-specific skills & settings)
+.claude/agents/
+.claude/commands/
+.claude/helpers/
+.claude-flow/
+.mcp.json
+!.claude/settings.json
+!.claude/skills/
+!.claude/skills/*.md
