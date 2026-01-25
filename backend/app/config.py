@@ -11,8 +11,16 @@ class Settings(BaseSettings):
     # Google/Gemini
     google_api_key: str
 
+    # OpenRouter
+    openrouter_api_key: str = ""
+
     # AtlasCloud Video API (Wan 2.5)
     atlascloud_api_key: str = ""
+
+    # LLM Provider Configuration
+    default_llm_provider: str = "google"  # "google" or "openrouter"
+    openrouter_default_model: str = "anthropic/claude-3.5-sonnet"
+    openrouter_provider: str = ""  # Optional: specific OpenRouter provider
 
     # App
     app_name: str = "NotebookLM Reimagined"

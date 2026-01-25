@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Union
 from datetime import datetime
 from uuid import UUID
 from enum import Enum
@@ -584,3 +584,149 @@ class GlobalChatResponse(BaseModel):
     citations: List[GlobalCitation] = []
     notebooks_queried: List[dict] = []  # List of {id, name, source_count}
     suggested_questions: List[str] = []
+
+
+# ============================================
+# Pagination Schemas
+# ============================================
+
+class PaginatedResponse(BaseModel):
+    """Base schema for paginated responses."""
+    items: List[Any] = Field(default_factory=list, description="Items for current page")
+    total: int = Field(..., ge=0, description="Total number of items")
+    page: int = Field(..., ge=1, description="Current page number (1-indexed)")
+    page_size: int = Field(..., ge=1, le=100, description="Number of items per page")
+    total_pages: int = Field(..., ge=0, description="Total number of pages")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "items": [{"id": "item1"}, {"id": "item2"}],
+                "total": 100,
+                "page": 1,
+                "page_size": 50,
+                "total_pages": 2
+            }
+        }
+
+
+class PaginationParams(BaseModel):
+    """Query parameters for pagination."""
+    page: int = Field(default=1, ge=1, description="Page number (1-indexed)")
+    page_size: int = Field(default=50, ge=1, le=100, description="Items per page (max 100)")
+
+
+class PaginatedModelsResponse(PaginatedResponse):
+    """Paginated response for OpenRouter models list."""
+    items: List[dict] = Field(default_factory=list, description="Model definitions for current page")
+    authenticated: bool = Field(default=False, description="Whether user is authenticated")
+    user_id: Optional[str] = Field(default=None, description="User ID if authenticated")
+    preview: bool = Field(default=False, description="Whether this is a limited preview")
+
+
+# ============================================
+# OpenRouter Security Schemas
+# ============================================
+
+# Allowlist of approved models to prevent arbitrary model usage
+ALLOWED_OPENROUTER_MODELS = {
+    "anthropic/claude-3.5-sonnet",
+    "anthropic/claude-3-opus",
+    "openai/gpt-4",
+    "openai/gpt-4-turbo",
+    "google/gemini-2.0-flash",
+    "google/gemini-2.5-flash",
+    "google/gemini-2.5-pro",
+    "meta/llama-3.1-70b",
+    "zai/c3-7b",
+    "zai/c3-13b",
+    "zai/c3-40b",
+}
+
+
+class OpenRouterGenerateRequest(BaseModel):
+    """Secure request schema for OpenRouter content generation."""
+    prompt: str = Field(
+        ...,
+        min_length=1,
+        max_length=50000,
+        description="User prompt to generate content from"
+    )
+    model_name: str = Field(
+        default="anthropic/claude-3.5-sonnet",
+        description="OpenRouter model identifier"
+    )
+    provider: Optional[str] = Field(
+        default=None,
+        description="Optional provider filter for OpenRouter"
+    )
+    system_instruction: Optional[str] = Field(
+        default=None,
+        max_length=10000,
+        description="Optional system instruction to guide generation"
+    )
+    temperature: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=2.0,
+        description="Sampling temperature (0.0 - 2.0)"
+    )
+    max_tokens: int = Field(
+        default=4096,
+        ge=1,
+        le=32768,
+        description="Maximum tokens to generate (1 - 32768)"
+    )
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "prompt": "Explain quantum computing in simple terms",
+                "model_name": "anthropic/claude-3.5-sonnet",
+                "temperature": 0.7,
+                "max_tokens": 4096
+            }
+        }
+
+
+class OpenRouterContextRequest(BaseModel):
+    """Secure request schema for OpenRouter context-based generation (RAG)."""
+    message: str = Field(
+        ...,
+        min_length=1,
+        max_length=10000,
+        description="User question/message"
+    )
+    context: str = Field(
+        ...,
+        min_length=1,
+        max_length=100000,
+        description="Document context for RAG"
+    )
+    model_name: str = Field(
+        default="anthropic/claude-3.5-sonnet",
+        description="OpenRouter model identifier"
+    )
+    provider: Optional[str] = Field(
+        default=None,
+        description="Optional provider filter for OpenRouter"
+    )
+    source_names: Optional[List[str]] = Field(
+        default=None,
+        description="Optional list of source names for citation"
+    )
+    persona_instructions: Optional[str] = Field(
+        default=None,
+        max_length=10000,
+        description="Optional persona instructions"
+    )
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "message": "When was Python created?",
+                "context": "Document 1: Python is a programming language...",
+                "model_name": "anthropic/claude-3.5-sonnet",
+                "source_names": ["Document 1", "Document 2"]
+            }
+        }
