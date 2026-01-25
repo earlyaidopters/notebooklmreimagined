@@ -43,3 +43,8 @@ htmlcov/
 
 # Private/local folders
 youtube/
+
+# Claude Code internal files
+.claude/
+.claude-flow/
+.mcp.json
