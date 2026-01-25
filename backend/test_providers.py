@@ -12,6 +12,7 @@ This script tests the new multi-LLM provider support endpoints:
 import asyncio
 import json
 import sys
+import math
 from pathlib import Path
 from typing import Dict, Any, Optional
 
@@ -222,8 +223,8 @@ async def test_provider_config(results: TestResults, settings):
 
 
 async def test_openrouter_models(results: TestResults, settings):
-    """Test 4: Simulate GET /api/v1/providers/models endpoint"""
-    print("\n🔍 Test 4: OpenRouter Models List")
+    """Test 4: Simulate GET /api/v1/providers/models endpoint with pagination"""
+    print("\n🔍 Test 4: OpenRouter Models List (Paginated)")
     print("-" * 80)
 
     if not settings.openrouter_api_key:
@@ -241,26 +242,126 @@ async def test_openrouter_models(results: TestResults, settings):
         print(f"  🔍 Fetching models from OpenRouter API...")
         models = await openrouter_service.get_available_models()
 
+        # Simulate paginated response (authenticated)
+        total_models = len(models)
+        default_page_size = 50
+        total_pages = math.ceil(total_models / default_page_size) if total_models > 0 else 1
+
         response = {
-            "models": models[:10],  # Return first 10 for display
-            "count": len(models)
+            "items": models[:default_page_size],  # First page
+            "total": total_models,
+            "page": 1,
+            "page_size": default_page_size,
+            "total_pages": total_pages,
+            "authenticated": True,
+            "preview": False
         }
 
-        print(f"  ✅ Found {len(models)} models")
-        print(f"  📋 Sample models:")
-        for model in models[:5]:
+        print(f"  ✅ Found {total_models} models")
+        print(f"  📋 Page 1 of {total_pages} (showing {len(response['items'])} models):")
+        for model in response['items'][:5]:
             print(f"     - {model['id']} ({model.get('provider', 'unknown')})")
+        print(f"     ... and {len(response['items']) - 5} more on this page")
 
         results.add(
             "OpenRouter Models List",
             True,
-            f"Retrieved {len(models)} models from OpenRouter",
+            f"Retrieved {total_models} models, showing page 1 of {total_pages}",
             response
         )
 
         return response
     except Exception as e:
         results.add("OpenRouter Models List", False, str(e))
+        print(f"  ❌ Error: {e}")
+        return None
+
+
+async def test_openrouter_models_cache(results: TestResults, settings):
+    """Test 4b: Verify caching works for models list"""
+    print("\n🔍 Test 4b: OpenRouter Models Caching")
+    print("-" * 80)
+
+    if not settings.openrouter_api_key:
+        msg = "OpenRouter not configured - add OPENROUTER_API_KEY to environment"
+        results.add("OpenRouter Models Caching", False, msg)
+        print(f"  ⚠️  {msg}")
+        return None
+
+    try:
+        import time
+
+        openrouter_service = get_openrouter_service()
+        if not openrouter_service:
+            raise ValueError("OpenRouter service not initialized")
+
+        # Clear cache first to ensure clean state
+        OpenRouterService.clear_models_cache()
+        print(f"  🔄 Cache cleared")
+
+        # First call - should fetch from API
+        print(f"  🔍 First call (should fetch from API)...")
+        start = time.time()
+        models1 = await openrouter_service.get_available_models()
+        first_call_time = time.time() - start
+        print(f"  ✅ First call took {first_call_time:.3f}s, returned {len(models1)} models")
+
+        # Second call - should use cache (much faster)
+        print(f"  🔍 Second call (should use cache)...")
+        start = time.time()
+        models2 = await openrouter_service.get_available_models()
+        second_call_time = time.time() - start
+        print(f"  ✅ Second call took {second_call_time:.3f}s, returned {len(models2)} models")
+
+        # Verify results are identical
+        models_match = len(models1) == len(models2)
+        speedup = first_call_time / second_call_time if second_call_time > 0 else float('inf')
+
+        print(f"  📊 Cache speedup: {speedup:.1f}x faster")
+
+        # Test force_refresh - should fetch from API again
+        print(f"  🔍 Third call with force_refresh=True (should fetch from API)...")
+        start = time.time()
+        models3 = await openrouter_service.get_available_models(force_refresh=True)
+        third_call_time = time.time() - start
+        print(f"  ✅ Force refresh took {third_call_time:.3f}s, returned {len(models3)} models")
+
+        # Test clear_models_cache
+        OpenRouterService.clear_models_cache()
+        print(f"  🔄 Cache cleared via clear_models_cache()")
+
+        # Verify cache was cleared (should fetch from API again)
+        start = time.time()
+        models4 = await openrouter_service.get_available_models()
+        fourth_call_time = time.time() - start
+        print(f"  ✅ After clear, call took {fourth_call_time:.3f}s (should be similar to first)")
+
+        # Cache is working if second call is significantly faster
+        cache_working = second_call_time < first_call_time * 0.5  # At least 2x faster
+        results_match = models_match
+
+        results.add(
+            "OpenRouter Models Caching",
+            cache_working and results_match,
+            f"Speedup: {speedup:.1f}x, Results match: {results_match}",
+            {
+                "first_call_time": f"{first_call_time:.3f}s",
+                "second_call_time": f"{second_call_time:.3f}s",
+                "speedup": f"{speedup:.1f}x",
+                "models_match": results_match
+            }
+        )
+
+        if not cache_working:
+            results.add_warning("Cache may not be working - second call should be faster")
+
+        return {
+            "first_call_time": first_call_time,
+            "second_call_time": second_call_time,
+            "speedup": speedup
+        }
+    except Exception as e:
+        results.add("OpenRouter Models Caching", False, str(e))
         print(f"  ❌ Error: {e}")
         return None
 
@@ -403,6 +504,9 @@ async def main():
 
     # Test 4: OpenRouter models (requires API key)
     await test_openrouter_models(results, settings)
+
+    # Test 4b: OpenRouter models caching (requires API key)
+    await test_openrouter_models_cache(results, settings)
 
     # Test 5: OpenRouter generation (requires API key)
     await test_openrouter_generation(results, settings)

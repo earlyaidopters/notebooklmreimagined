@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Union
 from datetime import datetime
 from uuid import UUID
 from enum import Enum
@@ -584,6 +584,44 @@ class GlobalChatResponse(BaseModel):
     citations: List[GlobalCitation] = []
     notebooks_queried: List[dict] = []  # List of {id, name, source_count}
     suggested_questions: List[str] = []
+
+
+# ============================================
+# Pagination Schemas
+# ============================================
+
+class PaginatedResponse(BaseModel):
+    """Base schema for paginated responses."""
+    items: List[Any] = Field(default_factory=list, description="Items for current page")
+    total: int = Field(..., ge=0, description="Total number of items")
+    page: int = Field(..., ge=1, description="Current page number (1-indexed)")
+    page_size: int = Field(..., ge=1, le=100, description="Number of items per page")
+    total_pages: int = Field(..., ge=0, description="Total number of pages")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "items": [{"id": "item1"}, {"id": "item2"}],
+                "total": 100,
+                "page": 1,
+                "page_size": 50,
+                "total_pages": 2
+            }
+        }
+
+
+class PaginationParams(BaseModel):
+    """Query parameters for pagination."""
+    page: int = Field(default=1, ge=1, description="Page number (1-indexed)")
+    page_size: int = Field(default=50, ge=1, le=100, description="Items per page (max 100)")
+
+
+class PaginatedModelsResponse(PaginatedResponse):
+    """Paginated response for OpenRouter models list."""
+    items: List[dict] = Field(default_factory=list, description="Model definitions for current page")
+    authenticated: bool = Field(default=False, description="Whether user is authenticated")
+    user_id: Optional[str] = Field(default=None, description="User ID if authenticated")
+    preview: bool = Field(default=False, description="Whether this is a limited preview")
 
 
 # ============================================

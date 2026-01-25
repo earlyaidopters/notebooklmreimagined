@@ -18,10 +18,138 @@ settings = get_settings()
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(
     title=settings.app_name,
-    description="NotebookLM Reimagined - An API-first research intelligence platform",
+    description="""# NotebookLM Reimagined API
+
+An API-first research intelligence platform that combines the power of NotebookLM's AI-driven research with multi-provider LLM support.
+
+## Features
+
+- **Multi-Provider LLM Support**: Google Gemini and OpenRouter (100+ models)
+- **Notebook Management**: Create, organize, and manage research notebooks
+- **Source Integration**: Add documents, videos, audio, and web content
+- **AI-Powered Chat**: Context-aware conversations with your sources
+- **Study Materials**: Generate flashcards, quizzes, and study guides
+- **Audio Generation**: Create deep-dive audio overviews
+- **Video Generation**: Generate whiteboard-style videos
+- **Research Assistant**: Automated research with citation tracking
+- **Global Chat**: Query across all your notebooks at once
+- **Studio Outputs**: Generate data tables, reports, slide decks, and infographics
+
+## Authentication
+
+Most endpoints require authentication via Supabase Auth. Include your session token in the Authorization header:
+
+```
+Authorization: Bearer <your-supabase-jwt-token>
+```
+
+## Rate Limiting
+
+API requests are rate limited to prevent abuse:
+- Default: 30 requests per minute per IP
+- Authenticated users: Higher limits based on their plan
+- Rate limit headers are included in all responses
+
+## Error Handling
+
+All errors follow a consistent format:
+
+```json
+{
+  "error": {
+    "code": 400,
+    "message": "Error description"
+  }
+}
+```
+
+Common status codes:
+- `400` - Bad Request (invalid input)
+- `401` - Unauthorized (missing/invalid token)
+- `403` - Forbidden (insufficient permissions)
+- `404` - Not Found (resource doesn't exist)
+- `429` - Too Many Requests (rate limit exceeded)
+- `500` - Internal Server Error
+- `503` - Service Unavailable (external provider issue)
+
+## Providers
+
+The platform supports multiple LLM providers:
+
+- **Google Gemini**: The original NotebookLM provider
+- **OpenRouter**: Unified access to 100+ models including Claude, GPT-4, Llama, and more
+
+See the `/api/v1/providers` endpoint for available models and configuration status.
+""",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    contact={
+        "name": "NotebookLM Reimagined",
+        "url": "https://github.com/yourusername/notebooklm-reimagined",
+    },
+    license_info={
+        "name": "MIT",
+        "url": "https://opensource.org/licenses/MIT",
+    },
+    openapi_tags=[
+        {
+            "name": "providers",
+            "description": "LLM provider management and configuration. Check available models and provider status.",
+        },
+        {
+            "name": "notebooks",
+            "description": "Create and manage research notebooks. Notebooks contain sources and enable AI-powered conversations.",
+        },
+        {
+            "name": "sources",
+            "description": "Add and manage source materials (documents, videos, audio, web content) to notebooks.",
+        },
+        {
+            "name": "chat",
+            "description": "AI-powered conversations with notebook context, including citations and suggested questions.",
+        },
+        {
+            "name": "audio",
+            "description": "Generate audio overviews of notebook content in various formats.",
+        },
+        {
+            "name": "video",
+            "description": "Generate video summaries with different visual styles.",
+        },
+        {
+            "name": "research",
+            "description": "Automated research assistant that finds and analyzes sources on any topic.",
+        },
+        {
+            "name": "study",
+            "description": "Generate study materials including flashcards, quizzes, study guides, and FAQs.",
+        },
+        {
+            "name": "notes",
+            "description": "Save and manage notes from conversations and research.",
+        },
+        {
+            "name": "studio",
+            "description": "Generate structured outputs like data tables, reports, slide decks, and infographics.",
+        },
+        {
+            "name": "global-chat",
+            "description": "Query across multiple notebooks simultaneously for comprehensive research.",
+        },
+        {
+            "name": "api-keys",
+            "description": "Manage API keys for programmatic access to the platform.",
+        },
+        {
+            "name": "profile",
+            "description": "User profile and usage statistics.",
+        },
+        {
+            "name": "export",
+            "description": "Export notebooks and sources in various formats.",
+        },
+    ],
 )
 
 # Register rate limit exception handler with custom JSON response
@@ -181,8 +309,28 @@ app.include_router(profile.router, prefix="/api/v1")
 app.include_router(providers.router, prefix="/api/v1")
 
 
-@app.get("/")
+@app.get(
+    "/",
+    tags=["root"],
+    summary="API information",
+    description="Returns basic API information including name, version, and documentation links.",
+    responses={
+        200: {
+            "description": "API information retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "name": "NotebookLM Reimagined",
+                        "version": "1.0.0",
+                        "docs": "/docs"
+                    }
+                }
+            }
+        }
+    }
+)
 async def root():
+    """Get API information and documentation links."""
     return {
         "name": settings.app_name,
         "version": "1.0.0",
@@ -190,8 +338,24 @@ async def root():
     }
 
 
-@app.get("/health")
+@app.get(
+    "/health",
+    tags=["health"],
+    summary="Health check endpoint",
+    description="Check if the API is running and healthy. Can be used for monitoring and load balancer health checks.",
+    responses={
+        200: {
+            "description": "API is healthy",
+            "content": {
+                "application/json": {
+                    "example": {"status": "healthy"}
+                }
+            }
+        }
+    }
+)
 async def health():
+    """Health check endpoint for monitoring and load balancers."""
     return {"status": "healthy"}
 
 

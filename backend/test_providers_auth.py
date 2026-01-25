@@ -460,27 +460,35 @@ async def test_providers_models_unauthenticated(results: TestResults):
 
         data = response.json()
 
-        # Unauthenticated users get preview
+        # Unauthenticated users get preview with pagination
         has_authenticated = data.get("authenticated") == False
         has_preview = data.get("preview") == True
         has_message = "message" in data
-        has_models = "models" in data
-        has_count = "count" in data
+        has_items = "items" in data  # Changed from "models" to "items" for pagination
+        has_total = "total" in data
+        has_page = "page" in data
+        has_page_size = "page_size" in data
+        has_total_pages = "total_pages" in data
 
         # Should have limited models (10 or less)
-        model_count = len(data.get("models", []))
+        model_count = len(data.get("items", []))
         is_limited = model_count <= 10
+        page_is_1 = data.get("page") == 1
 
         passed = (
             has_authenticated and
             has_preview and
             has_message and
-            has_models and
-            has_count and
-            is_limited
+            has_items and
+            has_total and
+            has_page and
+            has_page_size and
+            has_total_pages and
+            is_limited and
+            page_is_1
         )
 
-        details = f"authenticated={data.get('authenticated')}, preview={data.get('preview')}, models={model_count}"
+        details = f"authenticated={data.get('authenticated')}, preview={data.get('preview')}, items={model_count}, total_pages={data.get('total_pages')}"
         results.add(
             "Providers Models (Unauthenticated)",
             passed,
@@ -491,8 +499,9 @@ async def test_providers_models_unauthenticated(results: TestResults):
         print(f"  ✅ Status code: {response.status_code}")
         print(f"  ✅ Authenticated: {data.get('authenticated')}")
         print(f"  ✅ Preview mode: {data.get('preview')}")
-        print(f"  ✅ Models returned: {model_count} (limited preview)")
-        print(f"  ✅ Total available: {data.get('count')}")
+        print(f"  ✅ Items returned: {model_count} (limited preview)")
+        print(f"  ✅ Total available: {data.get('total')}")
+        print(f"  ✅ Page: {data.get('page')}/{data.get('total_pages')}")
 
         return data
     except Exception as e:
@@ -502,8 +511,8 @@ async def test_providers_models_unauthenticated(results: TestResults):
 
 
 async def test_providers_models_authenticated(results: TestResults):
-    """Test GET /providers/models with authentication (full list)"""
-    print("\n🔍 Test 7: Providers Models (Authenticated - Full)")
+    """Test GET /providers/models with authentication (paginated list)"""
+    print("\n🔍 Test 7: Providers Models (Authenticated - Paginated)")
     print("-" * 80)
 
     try:
@@ -516,6 +525,7 @@ async def test_providers_models_authenticated(results: TestResults):
         client = TestClient(app)
 
         try:
+            # Test default pagination (page 1)
             response = client.get("/api/v1/providers/models")
         finally:
             # Clean up override
@@ -538,37 +548,58 @@ async def test_providers_models_authenticated(results: TestResults):
 
         data = response.json()
 
-        # Authenticated users get full list
+        # Authenticated users get paginated list
         has_authenticated = data.get("authenticated") == True
         has_user_id = "user_id" in data
-        has_models = "models" in data
-        has_count = "count" in data
+        has_items = "items" in data  # Changed from "models" to "items"
+        has_total = "total" in data
+        has_page = "page" in data
+        has_page_size = "page_size" in data
+        has_total_pages = "total_pages" in data
+        has_preview_false = data.get("preview") == False
 
-        # Should have more models than unauth preview (if available)
-        model_count = len(data.get("models", []))
-        is_full_list = model_count > 10 or data.get("count", 0) == model_count
+        # Check pagination values
+        model_count = len(data.get("items", []))
+        page = data.get("page")
+        page_size = data.get("page_size")
+        total_pages = data.get("total_pages")
+        total = data.get("total")
+
+        # Validate pagination logic
+        is_valid_pagination = (
+            page == 1 and  # First page
+            page_size <= 100 and  # Max page size
+            total_pages >= 1 and  # At least 1 page
+            model_count <= page_size  # Items don't exceed page size
+        )
 
         passed = (
             has_authenticated and
             has_user_id and
-            has_models and
-            has_count and
-            is_full_list
+            has_items and
+            has_total and
+            has_page and
+            has_page_size and
+            has_total_pages and
+            has_preview_false and
+            is_valid_pagination
         )
 
-        details = f"authenticated={data.get('authenticated')}, models={model_count}"
+        details = f"authenticated={data.get('authenticated')}, items={model_count}, page={page}/{total_pages}, total={total}"
         results.add(
             "Providers Models (Authenticated)",
             passed,
             details,
-            {"authenticated": data.get("authenticated"), "model_count": model_count, "total": data.get("count")}
+            {"authenticated": data.get("authenticated"), "items_count": model_count, "page": page, "total_pages": total_pages, "total": total}
         )
 
         print(f"  ✅ Status code: {response.status_code}")
         print(f"  ✅ Authenticated: {data.get('authenticated')}")
         print(f"  ✅ User ID: {data.get('user_id')}")
-        print(f"  ✅ Models returned: {model_count} (full list)")
-        print(f"  ✅ Total available: {data.get('count')}")
+        print(f"  ✅ Items returned: {model_count} (page {page})")
+        print(f"  ✅ Page size: {page_size}")
+        print(f"  ✅ Total pages: {total_pages}")
+        print(f"  ✅ Total models: {total}")
 
         return data
     except Exception as e:

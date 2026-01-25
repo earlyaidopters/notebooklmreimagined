@@ -1,9 +1,11 @@
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request, Query
 from typing import List, Dict, Any, Optional
 import logging
+import math
 from app.config import get_settings
 from app.services.openrouter import get_openrouter_service, OpenRouterService
 from app.services.auth import get_optional_user
+from app.models.schemas import PaginatedModelsResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/providers", tags=["providers"])
@@ -28,20 +30,64 @@ def _apply_rate_limit(endpoint_func: str, rate_limit: str):
     return decorator
 
 
-@router.get("")
+@router.get(
+    "",
+    summary="List available LLM providers",
+    description="""List all configured LLM providers with their available models and status.
+
+This endpoint returns different information based on authentication status:
+
+**Unauthenticated users** receive:
+- Provider ID, name, and description
+- Availability status (whether provider is configured)
+- List of available models
+
+**Authenticated users** additionally receive:
+- Default provider configuration
+- Default model settings
+- User ID for personalized settings
+
+The response includes both Google Gemini (original NotebookLM provider) and OpenRouter (100+ models including Claude, GPT-4, Llama).
+
+**Rate Limiting**: 30 requests per minute per IP address.
+""",
+    responses={
+        200: {
+            "description": "Providers retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "providers": [
+                            {
+                                "id": "google",
+                                "name": "Google Gemini",
+                                "description": "Original NotebookLM LLM provider",
+                                "available": True,
+                                "models": ["gemini-2.0-flash", "gemini-2.5-pro"]
+                            },
+                            {
+                                "id": "openrouter",
+                                "name": "OpenRouter",
+                                "description": "Access to 100+ LLM providers via unified API",
+                                "available": True,
+                                "models": ["anthropic/claude-3.5-sonnet", "openai/gpt-4"]
+                            }
+                        ],
+                        "default_provider": "openrouter",
+                        "default_model": "anthropic/claude-3.5-sonnet",
+                        "authenticated": True
+                    }
+                }
+            }
+        }
+    }
+)
 @_apply_rate_limit("list_providers", "30/minute")
 async def list_providers(
     request: Request,
     current_user: Optional[dict] = Depends(get_optional_user)
 ):
-    """
-    List available LLM providers with configuration status.
-
-    - Unauthenticated users: See public provider info (id, name, description, available models)
-    - Authenticated users: See additional configuration details
-
-    Rate limit: 30 requests per minute per IP address.
-    """
+    """List available LLM providers with configuration status."""
     settings = get_settings()
     is_authenticated = current_user is not None
 
@@ -98,17 +144,165 @@ async def list_providers(
     return response
 
 
-@router.get("/models")
+@router.get(
+    "/models",
+    summary="List OpenRouter models with pagination",
+    description="""List all available models from OpenRouter with pagination support.
+
+## Authentication & Access Control
+
+**Unauthenticated users** (Preview Mode):
+- Limited to first 10 models only
+- 1 page maximum
+- Message indicating full list requires authentication
+
+**Authenticated users** (Full Access):
+- Complete access to all 300+ models
+- Full pagination support
+- User-specific tracking
+
+## Pagination Parameters
+
+| Parameter | Type | Default | Constraints | Description |
+|-----------|------|---------|-------------|-------------|
+| `page` | integer | 1 | >= 1 | Page number (1-indexed) |
+| `page_size` | integer | 50 | 1-100 | Items per page (max 100) |
+
+## Response Format
+
+```json
+{
+  "items": [
+    {
+      "id": "anthropic/claude-3.5-sonnet",
+      "name": "Claude 3.5 Sonnet",
+      "context_length": 200000,
+      "pricing": {"prompt": 0.003, "completion": 0.015}
+    }
+  ],
+  "total": 346,
+  "page": 1,
+  "page_size": 50,
+  "total_pages": 7,
+  "authenticated": true,
+  "preview": false,
+  "user_id": "user-123"
+}
+```
+
+## Usage Examples
+
+```bash
+# Get first page (default: 50 items)
+GET /api/v1/providers/models
+
+# Get second page
+GET /api/v1/providers/models?page=2
+
+# Custom page size
+GET /api/v1/providers/models?page=1&page_size=100
+
+# Combined parameters
+GET /api/v1/providers/models?page=3&page_size=25
+```
+
+## Rate Limiting
+
+- **Limit**: 10 requests per minute per IP address
+- **Reason**: This endpoint makes expensive external API calls to OpenRouter
+- **Headers**: Rate limit info included in response headers
+
+## Error Responses
+
+| Status | Description |
+|--------|-------------|
+| 503 | OpenRouter service unavailable |
+| 500 | Failed to retrieve models from OpenRouter |
+""",
+    response_model=PaginatedModelsResponse,
+    responses={
+        200: {
+            "description": "Models retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "items": [
+                            {
+                                "id": "anthropic/claude-3.5-sonnet",
+                                "name": "Claude 3.5 Sonnet",
+                                "context_length": 200000,
+                                "pricing": {"prompt": 0.003, "completion": 0.015}
+                            }
+                        ],
+                        "total": 346,
+                        "page": 1,
+                        "page_size": 50,
+                        "total_pages": 7,
+                        "authenticated": True,
+                        "preview": False,
+                        "user_id": "user-123"
+                    }
+                }
+            }
+        },
+        503: {
+            "description": "OpenRouter service unavailable",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": {
+                            "code": 503,
+                            "message": "Provider service unavailable. Please try again later."
+                        }
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Failed to retrieve models",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": {
+                            "code": 500,
+                            "message": "Failed to retrieve models. Please try again later."
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
 @_apply_rate_limit("list_openrouter_models", "10/minute")
 async def list_openrouter_models(
     request: Request,
+    page: int = Query(default=1, ge=1, description="Page number (1-indexed)"),
+    page_size: int = Query(default=50, ge=1, le=100, description="Items per page (max 100)"),
     current_user: Optional[dict] = Depends(get_optional_user)
 ):
-    """
-    List all available models from OpenRouter.
+    """List available models from OpenRouter with pagination support.
 
-    - Unauthenticated users: Limited to 10 models (preview)
-    - Authenticated users: Full model list with no limit
+    Pagination Parameters:
+    - **page**: Page number (1-indexed, default: 1)
+    - **page_size**: Items per page (default: 50, max: 100)
+
+    Access Levels:
+    - **Unauthenticated**: Preview mode (first 10 models only, 1 page max)
+    - **Authenticated**: Full access to all models with pagination
+
+    Response Format:
+    ```json
+    {
+        "items": [...],           // Models for current page
+        "total": 346,             // Total model count
+        "page": 1,                // Current page
+        "page_size": 50,          // Items per page
+        "total_pages": 7,         // Total pages available
+        "authenticated": true,    // Auth status
+        "user_id": "user-123",    // User ID (if auth)
+        "preview": false          // Preview mode flag
+    }
+    ```
 
     Rate limit: 10 requests per minute per IP address.
     This endpoint makes expensive external API calls to OpenRouter.
@@ -124,22 +318,49 @@ async def list_openrouter_models(
 
     try:
         models = await openrouter_service.get_available_models()
+        total_models = len(models)
 
         # Unauthenticated users get a limited preview
         if current_user is None:
+            # Preview mode: max 10 items, 1 page only
+            preview_limit = 10
+            preview_models = models[:preview_limit]
+
             return {
-                "models": models[:10],
-                "count": len(models),
+                "items": preview_models,
+                "total": total_models,
+                "page": 1,
+                "page_size": len(preview_models),
+                "total_pages": 1,
                 "authenticated": False,
                 "preview": True,
+                "user_id": None,
                 "message": "Full model list available for authenticated users"
             }
 
-        # Authenticated users get the full list
+        # Authenticated users get paginated access
+        # Calculate pagination
+        total_pages = math.ceil(total_models / page_size) if total_models > 0 else 1
+
+        # Ensure page is within valid range
+        if page > total_pages:
+            page = total_pages
+
+        # Calculate slice indices
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+
+        # Get models for current page
+        paginated_models = models[start_idx:end_idx]
+
         return {
-            "models": models,
-            "count": len(models),
+            "items": paginated_models,
+            "total": total_models,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
             "authenticated": True,
+            "preview": False,
             "user_id": current_user.get("id")
         }
     except Exception as e:
@@ -151,14 +372,108 @@ async def list_openrouter_models(
         )
 
 
-@router.get("/config")
+@router.get(
+    "/config",
+    summary="Get provider configuration",
+    description="""Get current LLM provider configuration and default settings.
+
+This endpoint returns different information based on authentication status:
+
+**Unauthenticated users** receive:
+- Which providers are configured (boolean flags)
+- No sensitive configuration details
+
+**Authenticated users** receive:
+- Default provider selection
+- Default model settings
+- OpenRouter provider preferences
+- User-specific configuration
+
+## Response Fields
+
+| Field | Type | Auth Required | Description |
+|-------|------|---------------|-------------|
+| `google_configured` | boolean | No | Whether Google Gemini API key is set |
+| `openrouter_configured` | boolean | No | Whether OpenRouter API key is set |
+| `default_provider` | string | Yes | Default LLM provider (google/openrouter) |
+| `openrouter_default_model` | string | Yes | Default model for OpenRouter |
+| `openrouter_provider` | string | Yes | Preferred OpenRouter provider (optional) |
+| `authenticated` | boolean | No | Authentication status |
+| `user_id` | string | Yes | Current user ID |
+
+## Rate Limiting
+
+- **Limit**: 30 requests per minute per IP address
+- **Authentication**: Optional (different response levels)
+
+## Example Response (Authenticated)
+
+```json
+{
+  "google_configured": true,
+  "openrouter_configured": true,
+  "default_provider": "openrouter",
+  "openrouter_default_model": "anthropic/claude-3.5-sonnet",
+  "openrouter_provider": null,
+  "authenticated": true,
+  "user_id": "user-123"
+}
+```
+
+## Example Response (Unauthenticated)
+
+```json
+{
+  "google_configured": true,
+  "openrouter_configured": true,
+  "default_provider": "google",
+  "openrouter_default_model": "google/gemini-2.0-flash",
+  "openrouter_provider": null,
+  "authenticated": false
+}
+```
+""",
+    responses={
+        200: {
+            "description": "Configuration retrieved successfully",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "authenticated": {
+                            "summary": "Authenticated user response",
+                            "value": {
+                                "google_configured": True,
+                                "openrouter_configured": True,
+                                "default_provider": "openrouter",
+                                "openrouter_default_model": "anthropic/claude-3.5-sonnet",
+                                "openrouter_provider": None,
+                                "authenticated": True,
+                                "user_id": "user-123"
+                            }
+                        },
+                        "unauthenticated": {
+                            "summary": "Unauthenticated user response",
+                            "value": {
+                                "google_configured": True,
+                                "openrouter_configured": True,
+                                "default_provider": "google",
+                                "openrouter_default_model": "google/gemini-2.0-flash",
+                                "openrouter_provider": None,
+                                "authenticated": False
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
 @_apply_rate_limit("get_provider_config", "30/minute")
 async def get_provider_config(
     request: Request,
     current_user: Optional[dict] = Depends(get_optional_user)
 ):
-    """
-    Get current provider configuration.
+    """Get current provider configuration.
 
     - Unauthenticated users: Limited info (only which providers are available)
     - Authenticated users: Full configuration details including defaults

@@ -1,5 +1,7 @@
 import httpx
 import logging
+import asyncio
+import time
 from typing import Optional, List, Dict, Any
 from pydantic import ValidationError, Field
 from app.config import get_settings
@@ -11,6 +13,14 @@ from app.models.schemas import (
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+# Cache storage for models list
+_models_cache: Dict[str, Any] = {
+    "data": None,
+    "timestamp": 0,
+}
+_models_cache_lock = asyncio.Lock()
+MODELS_CACHE_TTL = 3600  # 1 hour in seconds
 
 # OpenRouter pricing (per 1M tokens - approximate)
 # Actual pricing varies by provider
@@ -235,33 +245,83 @@ Please answer based on the provided context sources, citing your sources."""
             system_instruction=system_instruction,
         )
 
-    async def get_available_models(self) -> List[Dict[str, Any]]:
-        """Get list of available models from OpenRouter."""
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "HTTP-Referer": "https://notebooklm-api.vercel.app",
-            "X-Title": "NotebookLM Reimagined",
-        }
+    async def get_available_models(self, force_refresh: bool = False) -> List[Dict[str, Any]]:
+        """Get list of available models from OpenRouter.
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(
-                f"{self.base_url}/models",
-                headers=headers
-            )
-            response.raise_for_status()
-            data = response.json()
+        Uses in-memory cache with 1-hour TTL to reduce API calls.
+        The models list changes infrequently, so caching significantly
+        improves performance for the /api/providers/models endpoint.
 
-        models = []
-        for model in data.get("data", []):
-            models.append({
-                "id": model["id"],
-                "name": model["name"],
-                "context_length": model.get("context_length", 4096),
-                "pricing": model.get("pricing", {}),
-                "provider": model.get("provider", {}).get("name", "unknown"),
-            })
+        Args:
+            force_refresh: If True, bypass cache and fetch fresh data from API.
 
-        return models
+        Returns:
+            List of model dictionaries with id, name, context_length,
+            pricing, and provider information.
+
+        Cache behavior:
+            - Cache TTL: 1 hour (3600 seconds)
+            - Thread-safe: Uses asyncio.Lock for concurrent requests
+            - Manual invalidation: Use force_refresh=True or clear_models_cache()
+        """
+        current_time = time.time()
+        cache_age = current_time - _models_cache["timestamp"]
+
+        # Check if cache is valid
+        if not force_refresh and _models_cache["data"] is not None and cache_age < MODELS_CACHE_TTL:
+            logger.debug(f"Using cached models list (age: {cache_age:.0f}s)")
+            return _models_cache["data"]
+
+        # Cache miss or expired - fetch fresh data
+        async with _models_cache_lock:
+            # Double-check after acquiring lock (another request might have refreshed)
+            current_time = time.time()
+            cache_age = current_time - _models_cache["timestamp"]
+            if not force_refresh and _models_cache["data"] is not None and cache_age < MODELS_CACHE_TTL:
+                return _models_cache["data"]
+
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "HTTP-Referer": "https://notebooklm-api.vercel.app",
+                "X-Title": "NotebookLM Reimagined",
+            }
+
+            logger.info("Fetching models list from OpenRouter API")
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(
+                    f"{self.base_url}/models",
+                    headers=headers
+                )
+                response.raise_for_status()
+                data = response.json()
+
+            models = []
+            for model in data.get("data", []):
+                models.append({
+                    "id": model["id"],
+                    "name": model["name"],
+                    "context_length": model.get("context_length", 4096),
+                    "pricing": model.get("pricing", {}),
+                    "provider": model.get("provider", {}).get("name", "unknown"),
+                })
+
+            # Update cache
+            _models_cache["data"] = models
+            _models_cache["timestamp"] = time.time()
+            logger.info(f"Cached {len(models)} models (TTL: {MODELS_CACHE_TTL}s)")
+
+            return models
+
+    @classmethod
+    def clear_models_cache(cls) -> None:
+        """Clear the models cache.
+
+        Use this to force a refresh on the next call to get_available_models().
+        For example, after updating the allowlist or when you need fresh data.
+        """
+        _models_cache["data"] = None
+        _models_cache["timestamp"] = 0
+        logger.info("Models cache cleared")
 
 
 # Singleton instance (created when API key is available)

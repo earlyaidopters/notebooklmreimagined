@@ -71,7 +71,143 @@ async def get_sources_content(notebook_id: UUID, source_ids: Optional[List[UUID]
     return "\n".join(context_parts), sources, source_names
 
 
-@router.post("", response_model=ApiResponse)
+@router.post(
+    "",
+    response_model=ApiResponse,
+    summary="Send a chat message",
+    description="""Send a message to a notebook's AI assistant and receive a context-aware response.
+
+This endpoint supports multi-provider LLM generation (Google Gemini and OpenRouter) with:
+
+## Features
+
+- **RAG (Retrieval-Augmented Generation)**: Responses include context from notebook sources
+- **Citation Tracking**: Automatic citation extraction with source attribution
+- **Suggested Questions**: AI-generated follow-up questions based on conversation
+- **Persona Support**: Custom AI personas defined in notebook settings
+- **Multi-Provider**: Choose between Google Gemini or OpenRouter (100+ models)
+
+## Request Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `notebook_id` | UUID | Yes | Notebook ID (from URL path) |
+| `message` | string | Yes | User's message/question |
+| `session_id` | UUID | No | Existing chat session ID (creates new if omitted) |
+| `source_ids` | List[UUID] | No | Specific sources to use for context |
+| `model` | string | No | Model for Google provider (default: gemini-2.0-flash) |
+| `provider` | string | No | LLM provider: `google` or `openrouter` |
+| `provider_model` | string | No | Specific model when using OpenRouter |
+
+## Provider Selection
+
+1. **Query parameter `provider`**: Explicitly set provider
+2. **Default configuration**: Falls back to `DEFAULT_LLM_PROVIDER` env variable
+3. **Final fallback**: Google Gemini
+
+## Response Format
+
+```json
+{
+  "data": {
+    "message_id": "uuid",
+    "session_id": "uuid",
+    "content": "AI response with [1] citations",
+    "citations": [
+      {
+        "number": 1,
+        "source_id": "uuid",
+        "source_name": "Document.pdf",
+        "text": "Cited text excerpt...",
+        "confidence": 0.9
+      }
+    ],
+    "suggested_questions": [
+      "Follow-up question 1?",
+      "Follow-up question 2?",
+      "Follow-up question 3?"
+    ]
+  },
+  "usage": {
+    "input_tokens": 1234,
+    "output_tokens": 567,
+    "cost_usd": 0.0023,
+    "provider": "openrouter"
+  }
+}
+```
+
+## Citation Format
+
+Responses use bracket notation `[1]`, `[2]` etc. for citations. Each citation number corresponds to a source in the `citations` array.
+
+## Rate Limiting
+
+Inherits from notebook-level rate limits.
+""",
+    responses={
+        200: {
+            "description": "Message processed successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "data": {
+                            "message_id": "550e8400-e29b-41d4-a716-446655440000",
+                            "session_id": "660e8400-e29b-41d4-a716-446655440000",
+                            "content": "Based on the sources, here's what I found...",
+                            "citations": [
+                                {
+                                    "number": 1,
+                                    "source_id": "770e8400-e29b-41d4-a716-446655440000",
+                                    "source_name": "research_paper.pdf",
+                                    "text": "Key finding from the source...",
+                                    "confidence": 0.9
+                                }
+                            ],
+                            "suggested_questions": [
+                                "Can you elaborate on point 2?",
+                                "What are the implications?",
+                                "How does this compare to other studies?"
+                            ]
+                        },
+                        "usage": {
+                            "input_tokens": 1234,
+                            "output_tokens": 567,
+                            "cost_usd": 0.0023,
+                            "provider": "openrouter"
+                        }
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Notebook not found",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": {
+                            "code": 404,
+                            "message": "Notebook not found"
+                        }
+                    }
+                }
+            }
+        },
+        503: {
+            "description": "Provider not configured",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": {
+                            "code": 503,
+                            "message": "OpenRouter not configured. Add OPENROUTER_API_KEY to environment."
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
 async def send_message(
     notebook_id: UUID,
     chat: ChatMessage,
@@ -79,7 +215,7 @@ async def send_message(
     provider_model: Optional[str] = None,
     user: dict = Depends(get_current_user),
 ):
-    """Send a chat message and get a response."""
+    """Send a chat message and get an AI response with context-aware citations and suggested follow-up questions."""
     app_settings = get_settings()
     notebook = await verify_notebook_access(notebook_id, user["id"])
     supabase = get_supabase_client()
@@ -223,7 +359,66 @@ async def send_message(
     return ApiResponse(data=response_data, usage=usage_data)
 
 
-@router.get("/sessions", response_model=ApiResponse)
+@router.get(
+    "/sessions",
+    response_model=ApiResponse,
+    summary="List chat sessions",
+    description="""List all chat sessions for a notebook, ordered by most recently updated.
+
+## Response Format
+
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "notebook_id": "uuid",
+      "title": "First 50 characters of first message",
+      "created_at": "2024-01-15T10:30:00Z",
+      "updated_at": "2024-01-15T11:45:00Z"
+    }
+  ]
+}
+```
+
+## Ordering
+
+Sessions are ordered by `updated_at` in descending order (most recent first).
+""",
+    responses={
+        200: {
+            "description": "Sessions retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "data": [
+                            {
+                                "id": "550e8400-e29b-41d4-a716-446655440000",
+                                "notebook_id": "440e8400-e29b-41d4-a716-446655440000",
+                                "title": "What are the key findings?",
+                                "created_at": "2024-01-15T10:30:00Z",
+                                "updated_at": "2024-01-15T11:45:00Z"
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Notebook not found",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": {
+                            "code": 404,
+                            "message": "Notebook not found"
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
 async def list_sessions(
     notebook_id: UUID,
     user: dict = Depends(get_current_user),
